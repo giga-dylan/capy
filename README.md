@@ -31,15 +31,17 @@ Nothing is sent to a cloud model provider; there isn't one configured.
 ## See it in action
 
 <p align="center">
-  <a href="assets/demo.mp4"><img src="assets/demo.gif" width="100%" alt="Capy recording: a request to add a slugify helper with a test; the agent reads the project, asks before editing two files and running npm test, and reports that both tests pass."></a>
+  <a href="assets/demo.mp4"><img src="assets/demo.gif" width="100%" alt="Capy recording: a request to plan and add a slugify helper with a test; the agent writes a to-do list, asks before editing two files and running npm test, ticks off the list, reports that both tests pass, and the Changes panel shows the diff."></a>
 </p>
 <p align="center"><strong><a href="assets/demo.mp4">Open the video with pause and scrub controls</a></strong><br>
-<sub>Real recording on an M5 Max running Qwen 3.8 27B (MLX, 4-bit) locally. Sped up 1.3×; waiting is trimmed.</sub></p>
+<sub>Real recording on an M5 Max running Qwen 3.8 27B (MLX, 4-bit) locally. Sped up 2×; waiting is trimmed.</sub></p>
 
-**The example:** in a small Node project, you ask for *“a slugify(text) helper in
-src/utils.js with a test, then run the tests.”* The agent explores the project, then asks
-for approval before each edit and before running `npm test`. It finishes with working code
-and two passing tests, in about 50 seconds, without a byte leaving the laptop.
+**The example:** in a small git project, you ask Capy to *“plan this with your to-do list:
+add a slugify(text) helper to src/utils.js, add a test for it, then run the tests.”* The
+agent writes a to-do list, explores the project, and asks for approval before each edit and
+before running `npm test`, ticking items off as it goes. It finishes with working code and
+two passing tests, and the **Changes** panel shows exactly what it did, all without a byte
+leaving the laptop.
 
 <p align="center">
   <a href="#start">Start</a> ·
@@ -76,12 +78,17 @@ the folder button in the chat box when you want the agent to work on code.
 | Thinking | Thinking picker in the chat box | Only the levels the selected model supports |
 | Mode | `/plan`, `/build` | Switch the chat between opencode's agents (and your own primary agents) |
 | Goal | `/goal <objective>` | The agent keeps going across turns until the goal is met (`/pause_goal`, `/resume_goal`) |
-| Side chat | **Side chat** button | Ask about the current chat in a panel that never adds to it |
+| Side chat | **Side chat** button or `/side` | Ask about the current chat in a panel that never adds to it |
 | Commands | Type `/` | Built-in, your own and skill commands, with Tab completion; `/compact` summarizes the chat |
 | Files | Type `@`, the paperclip, or paste/drop | Mention project files or MCP resources; attach images for vision models |
 | Shell | Start a message with `!` | Run a command directly in the chat's folder (`!git status`) |
 | Access | Access picker in the chat box | **Ask first**, **Auto-approve** (work inside the project runs freely) or **Full access** (never asks) |
 | Trust | Approval cards in the chat | Allow once, always allow, or deny each edit and command |
+
+<p align="center">
+  <img src="assets/screenshot-access.png" width="49%" alt="The Access menu in the chat box: Ask first, Auto-approve and Full access, each with a short description.">
+  <img src="assets/screenshot-thinking.png" width="49%" alt="The Thinking menu in the chat box: Off, Low, Medium (model default) and Extra high.">
+</p>
 
 **Requirements:** an Apple Silicon Mac with **32 GB of memory or more** for the 27–30B
 models (smaller models need less) and macOS 14 or later.
@@ -104,6 +111,19 @@ opencode's config from your settings and installed models, and forwards live eve
 | Private app data | `settings.json`, chats, rules, agents, skills, plugins, custom tools |
 
 ## Working with the agent
+
+<p align="center">
+  <img src="assets/screenshot-chat.png" width="100%" alt="A finished task in Capy: tool calls with timings, a Markdown summary, the completed to-do list, the git branch chip showing two changed files, and the Changes panel with a colored diff of src/utils.js.">
+</p>
+
+Next to each chat, a right-hand panel shows the **Side chat**, **Subagents**, **Changes**,
+**Files** and **Terminal**.
+
+<p align="center">
+  <img src="assets/screenshot-files.png" width="32%" alt="Files panel: src/utils.js open with line numbers, plus text, file-name and symbol search and an Add to chat button.">
+  <img src="assets/screenshot-terminal.png" width="32%" alt="Terminal panel running npm test in the project folder, with both tests passing.">
+  <img src="assets/screenshot-side-chat.png" width="32%" alt="Side chat panel answering a question about the main conversation without adding to it.">
+</p>
 
 Everything here is a view over opencode's own API, so it behaves exactly like opencode does.
 
@@ -142,9 +162,6 @@ so guessing would mean a picker that does nothing. These were tested on real mod
 | Always thinks | DeepSeek-R1 | “Thinking: always on” (not adjustable) |
 | No thinking | most instruct models | nothing |
 
-<p align="center">
-  <img src="assets/screenshot-chat-thinking.png" width="80%" alt="The chat box with the Thinking menu open: Off, Low, Medium (model default) and Extra high.">
-</p>
 
 ## Settings
 
@@ -158,7 +175,7 @@ what's configured.
 </p>
 <p align="center">
   <img src="assets/screenshot-settings-agents.png" width="49%" alt="Agents settings: built-in and custom agents with per-agent overrides.">
-  <img src="assets/screenshot-settings-skills.png" width="49%" alt="Skills settings: loaded skills by source, your own skills, and extra skill folders or URLs.">
+  <img src="assets/screenshot-settings-mcp.png" width="49%" alt="MCP settings: the built-in browser (on, connected, with a show-window toggle) and an Add server button.">
 </p>
 
 | Tab | What it covers |
