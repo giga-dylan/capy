@@ -29,13 +29,19 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  # Every bundled binary/dylib must be signed for notarization.
+  # Bundled executables outside the usual places; electron-builder signs these explicitly.
   binaries:
     - Contents/Resources/bin/opencode
     - Contents/Resources/bin/ollama/ollama
     - Contents/Resources/bin/ollama/llama-server
+    - Contents/Resources/bin/ollama/llama-quantize
+  # Notarizes when APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID are set (skipped otherwise).
   notarize: true
 dmg:
   artifactName: ${productName}-${version}-arm64.dmg
 publish:
   provider: github
+  owner: giga-dylan
+  repo: capy
+  # CI uploads to a draft release; publish it on GitHub when you're ready.
+  releaseType: draft

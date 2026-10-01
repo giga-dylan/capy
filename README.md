@@ -53,7 +53,19 @@ leaving the laptop.
 
 ## Start
 
-Build and run it from source (signed releases are coming):
+### Install
+
+1. Download **`Capy-<version>-arm64.dmg`** from [Releases](https://github.com/giga-dylan/capy/releases).
+2. Open it and drag **Capy** into **Applications**.
+3. Open Capy. Current builds aren't notarized by Apple yet, so macOS blocks the first launch:
+   open **System Settings → Privacy & Security**, scroll to *“Capy was blocked…”*, click
+   **Open Anyway**, and confirm. You only do this once.
+
+Everything Capy needs (Ollama, opencode, the browser tool) is inside the app; no Node.js,
+Homebrew or terminal required. Capy checks GitHub for new versions and offers the download
+(once builds are signed, updates will install themselves).
+
+### Or run from source
 
 ```sh
 git clone https://github.com/giga-dylan/capy.git
@@ -240,13 +252,23 @@ installed yourself. **Open config folder** in Settings jumps straight there.
 npm install          # dependencies + pinned Ollama/opencode builds in resources/bin
 npm run dev          # run with hot reload
 npm run typecheck
-npm run dist         # signed + notarized arm64 DMG/zip in dist/
+npm run dist         # arm64 DMG + zip in dist/ (signed if a Developer ID cert is available)
 ```
 
 Pinned runtime versions live in `package.json` → `"binaries"`; bump them together with
 `@opencode-ai/sdk` and `opencode-darwin-arm64`, then run `npm run fetch-binaries`.
-Release builds need a Developer ID certificate plus `APPLE_ID`,
-`APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`.
+
+**Releasing:** bump `version` in `package.json`, commit, then push a matching tag
+(`git tag v0.2.0 && git push origin v0.2.0`). The [Release workflow](.github/workflows/release.yml)
+builds on an Apple Silicon runner and uploads the DMG, zip and `latest-mac.yml` to a **draft**
+release; publish it on GitHub to make it the update everyone gets.
+
+**Signing:** without a certificate, builds are ad-hoc signed (users approve them once, and
+they can't update themselves). To sign and notarize, join the Apple Developer Program and add
+repository secrets `MAC_CERTIFICATE_P12` (base64 of your *Developer ID Application* .p12),
+`MAC_CERTIFICATE_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`. The
+workflow picks them up automatically. Locally, `npm run dist` uses a Developer ID certificate
+from your Keychain and notarizes when the `APPLE_*` variables are set.
 
 ```
 src/main/       Electron main: services (ollama.ts, opencode.ts), settings, extensions, IPC

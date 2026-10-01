@@ -9,6 +9,10 @@ function listen<A extends unknown[]>(channel: string, cb: (...args: A) => void):
 
 const api: CapyApi = {
   getStatus: () => ipcRenderer.invoke(IPC.getStatus),
+  getUpdateState: () => ipcRenderer.invoke(IPC.getUpdateState),
+  checkForUpdates: () => ipcRenderer.invoke(IPC.checkForUpdates),
+  installUpdate: () => ipcRenderer.invoke(IPC.installUpdate),
+  onUpdateState: (cb) => listen(IPC.updateState, cb),
   getSettings: () => ipcRenderer.invoke(IPC.getSettings),
   saveSettings: (patch) => ipcRenderer.invoke(IPC.saveSettings, patch),
   getEffectiveConfig: () => ipcRenderer.invoke(IPC.getEffectiveConfig),

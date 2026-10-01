@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SaveResult } from '@shared/types'
 import { useInstalledModels } from '../../models'
 import { ModelLibrary } from '../ModelLibrary'
+import { useUpdateState } from '../UpdateBanner'
 import { useSettings } from './context'
 import { btn, inputCls, SaveMessage, Section } from './ui'
 
@@ -107,7 +108,44 @@ export function GeneralSection(): React.JSX.Element {
         </div>
       </Section>
 
+      <About />
+
       <SaveMessage result={result} />
     </div>
+  )
+}
+
+function About(): React.JSX.Element {
+  const update = useUpdateState()
+  if (!update) return <span />
+  const status: Record<typeof update.status, string> = {
+    dev: 'Development build: updates are off.',
+    idle: '',
+    checking: 'Checking for updates…',
+    'up-to-date': 'You’re up to date.',
+    available: `Capy ${update.latest} is available.`,
+    downloading: `Downloading Capy ${update.latest ?? ''}… ${update.percent ?? 0}%`,
+    ready: `Capy ${update.latest} is ready: restart to update.`,
+    error: 'Couldn’t check for updates.'
+  }
+  return (
+    <Section title="About" description="Updates come from Capy’s GitHub releases.">
+      <div className="flex items-center gap-3">
+        <span className="text-sm">Capy {update.version}</span>
+        <span className="flex-1 text-xs text-neutral-500" title={update.error}>
+          {status[update.status]}
+          {update.status !== 'dev' && !update.canInstall && ' This copy isn’t signed by Apple, so updates download from GitHub instead of installing themselves.'}
+        </span>
+        {update.status === 'available' || update.status === 'ready' ? (
+          <button onClick={() => window.api.installUpdate()} className={btn.primary}>
+            {update.status === 'ready' ? 'Restart to update' : 'Download'}
+          </button>
+        ) : (
+          <button disabled={update.status === 'dev' || update.status === 'checking'} onClick={() => window.api.checkForUpdates()} className={btn.secondary}>
+            Check for updates
+          </button>
+        )}
+      </div>
+    </Section>
   )
 }

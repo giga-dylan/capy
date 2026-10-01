@@ -13,11 +13,12 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "npm run build && electron-builder --mac --arm64"
+    "dist": "node scripts/dist.mjs"
   },
   "dependencies": {
     "@opencode-ai/sdk": "1.18.34",
-    "@playwright/mcp": "0.0.83"
+    "@playwright/mcp": "0.0.83",
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
@@ -43,5 +44,9 @@
   "binaries": {
     "ollama": "0.35.0",
     "opencode": "1.18.34"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/giga-dylan/capy.git"
   }
 }

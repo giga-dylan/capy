@@ -21,10 +21,12 @@ import { buildConfig, CHROME_PATH, effortVariants, OpencodeRuntime, PROVIDER_ID 
 import { chatsDirectory, ProjectStore } from './projects'
 import { deleteExtension, listExtensions, opencodeConfigDir, readRules, writeExtension, writeRules } from './extensions'
 import { isPlainObject, loadSettings, saveSettings } from './settings'
+import { Updater } from './updater'
 
 const ollama = new OllamaRuntime()
 const opencode = new OpencodeRuntime()
 const projects = new ProjectStore()
+const updater = new Updater((state) => win?.webContents.send(IPC.updateState, state))
 let win: BrowserWindow | undefined
 let settings: AppSettings
 let models: InstalledModel[] = []
@@ -208,6 +210,9 @@ function importSource(path: string): string {
 function registerIpc(): void {
   ipcMain.handle(IPC.getStatus, () => status)
   ipcMain.handle(IPC.getSettings, () => settings)
+  ipcMain.handle(IPC.getUpdateState, () => updater.state)
+  ipcMain.handle(IPC.checkForUpdates, () => updater.check())
+  ipcMain.handle(IPC.installUpdate, () => updater.install())
   ipcMain.handle(IPC.saveSettings, (_e, patch: Partial<AppSettings>) => applySettings(patch))
   ipcMain.handle(IPC.getEffectiveConfig, () => buildConfig(settings, ollama.baseUrl, models))
   ipcMain.handle(IPC.opencodeConfigDir, () => opencodeConfigDir())
@@ -437,6 +442,7 @@ app.whenReady().then(() => {
   registerIpc()
   createWindow()
   bootRuntimes()
+  void updater.start()
   app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
 })
 

@@ -10,6 +10,7 @@ import { TerminalPanel } from './panels/TerminalPanel'
 import { SettingsPage } from './settings/SettingsPage'
 import { SideChat } from './SideChat'
 import { Sidebar } from './Sidebar'
+import { UpdateBanner } from './UpdateBanner'
 
 export interface ActiveChat {
   directory: string
@@ -203,6 +204,7 @@ export function Shell({ status }: { status: RuntimeStatus }): React.JSX.Element 
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <StatusBanner status={status} />
+        <UpdateBanner />
         {notice && (
           <div className="flex items-center gap-2 bg-amber-500/15 px-4 py-1.5 text-xs text-amber-700 dark:text-amber-300">
             <span className="flex-1">{notice}</span>

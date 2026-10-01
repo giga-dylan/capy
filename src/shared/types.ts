@@ -116,6 +116,18 @@ export interface RuntimeInventory {
   errors: string[]
 }
 
+/** App version and update status (see src/main/updater.ts). */
+export interface UpdateState {
+  version: string
+  status: 'dev' | 'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error'
+  /** Signed builds install updates themselves; unsigned ones link to the download. */
+  canInstall: boolean
+  latest?: string
+  url?: string
+  percent?: number
+  error?: string
+}
+
 export type SaveResult = { ok: true; settings: AppSettings } | { ok: false; error: string }
 
 export type PermissionResponse = 'once' | 'always' | 'reject'
@@ -123,6 +135,11 @@ export type PermissionResponse = 'once' | 'always' | 'reject'
 /** The API exposed to the renderer on `window.api` (see src/preload). */
 export interface CapyApi {
   getStatus(): Promise<RuntimeStatus>
+  getUpdateState(): Promise<UpdateState>
+  checkForUpdates(): Promise<void>
+  /** Restarts into a downloaded update, or opens the release page when the app can't self-update. */
+  installUpdate(): Promise<void>
+  onUpdateState(cb: (state: UpdateState) => void): () => void
   getSettings(): Promise<AppSettings>
   /** Validates, saves and applies settings (restarting services as needed). */
   saveSettings(patch: Partial<AppSettings>): Promise<SaveResult>
@@ -216,6 +233,10 @@ export type OcMethod = (typeof OC_METHODS)[number]
 export const IPC = {
   getStatus: 'runtime:get-status',
   status: 'runtime:status',
+  getUpdateState: 'update:get',
+  checkForUpdates: 'update:check',
+  installUpdate: 'update:install',
+  updateState: 'update:state',
   getSettings: 'settings:get',
   saveSettings: 'settings:save',
   getEffectiveConfig: 'settings:effective-config',
