@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AppSettings } from '@shared/types'
+import type { AppSettings, OpencodeConfig } from '@shared/types'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   // The -mlx variant runs on Ollama's MLX engine (faster on Apple Silicon).
@@ -9,30 +9,35 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Agents need a large window; Ollama's 4K default silently truncates and breaks tool use.
   contextLength: 32_768,
   maxOutputTokens: 8192,
+  reasoningEffort: {},
+  // Off so Capy only uses what's configured in Capy (and keeps prompts small for local models).
+  claudeSkills: false,
+  claudeRules: false,
   // Anything that changes the machine goes through the approval UI by default.
-  permissions: { edit: 'ask', bash: 'ask', webfetch: 'ask', external_directory: 'ask' },
-  opencodeOverrides: '{}'
+  opencode: { permission: { edit: 'ask', bash: 'ask', webfetch: 'ask', external_directory: 'ask' } }
 }
 
 const file = (): string => join(app.getPath('userData'), 'settings.json')
 
+/** Earlier versions stored `permissions` and a raw `opencodeOverrides` string separately. */
+type LegacySettings = Partial<AppSettings> & { permissions?: Record<string, string>; opencodeOverrides?: string }
+
 /** Reads settings.json from the app's data folder; missing keys fall back to defaults. */
 export function loadSettings(): AppSettings {
-  const saved = existsSync(file()) ? (JSON.parse(readFileSync(file(), 'utf8')) as Partial<AppSettings>) : {}
-  return { ...DEFAULT_SETTINGS, ...saved, permissions: { ...DEFAULT_SETTINGS.permissions, ...saved.permissions } }
+  const saved: LegacySettings = existsSync(file()) ? JSON.parse(readFileSync(file(), 'utf8')) : {}
+  const { permissions, opencodeOverrides, ...rest } = saved
+  let opencode: OpencodeConfig = rest.opencode ?? DEFAULT_SETTINGS.opencode
+  if (!rest.opencode && (permissions || opencodeOverrides)) {
+    const overrides = opencodeOverrides ? (JSON.parse(opencodeOverrides) as OpencodeConfig) : {}
+    opencode = { ...overrides, permission: { ...permissions, ...(overrides.permission as object) } }
+  }
+  return { ...DEFAULT_SETTINGS, ...rest, opencode }
 }
 
 export function saveSettings(settings: AppSettings): void {
   writeFileSync(file(), JSON.stringify(settings, null, 2))
 }
 
-/** Returns an error message if the overrides aren't a JSON object, else undefined. */
-export function validateOverrides(text: string): string | undefined {
-  try {
-    const value: unknown = JSON.parse(text || '{}')
-    if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'Overrides must be a JSON object.'
-  } catch (err) {
-    return `Invalid JSON: ${(err as Error).message}`
-  }
-  return undefined
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
 }

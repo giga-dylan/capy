@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { InstalledModel, ModelProgress } from '@shared/types'
+import type { InstalledModel, ModelProgress, RuntimeInventory } from '@shared/types'
 
 export interface RecommendedModel {
   name: string
@@ -44,4 +44,15 @@ export function useModelProgress(): Record<string, ModelProgress> {
 
 export function progressPercent(p: ModelProgress | undefined): number | undefined {
   return p?.total ? Math.round(((p.completed ?? 0) / p.total) * 100) : undefined
+}
+
+/** Live opencode inventory (agents, commands, ...); refreshed whenever the engine (re)starts. */
+export function useInventory(): RuntimeInventory | undefined {
+  const [inventory, setInventory] = useState<RuntimeInventory>()
+  useEffect(() => {
+    const load = (): void => void window.api.inspect().then(setInventory).catch(() => undefined)
+    load()
+    return window.api.onStatus((s) => s.opencode === 'ready' && load())
+  }, [])
+  return inventory
 }

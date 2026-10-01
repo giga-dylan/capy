@@ -40,11 +40,14 @@ export interface InstalledModel {
   quantization: string
   /** e.g. completion, tools, thinking, vision. Agents need "tools". */
   capabilities: string[]
+  /** Reasoning levels the model accepts (from Ollama), e.g. [false, "low", "medium", "xhigh"]. */
+  thinking?: { values: (string | boolean)[]; default?: string | boolean }
 }
 
 export type PermissionLevel = 'ask' | 'allow' | 'deny'
-export const PERMISSION_KEYS = ['edit', 'bash', 'webfetch', 'external_directory'] as const
-export type PermissionKey = (typeof PERMISSION_KEYS)[number]
+
+/** opencode config (opencode.ai/config.json). Kept loose here; the SDK's Config type is the reference. */
+export type OpencodeConfig = Record<string, unknown>
 
 export interface AppSettings {
   /** Active Ollama model tag. */
@@ -54,9 +57,40 @@ export interface AppSettings {
   /** Context window (tokens) Ollama loads models with, and opencode plans around. */
   contextLength: number
   maxOutputTokens: number
-  permissions: Record<PermissionKey, PermissionLevel>
-  /** Raw JSON object deep-merged over the generated opencode config. */
-  opencodeOverrides: string
+  /** Chosen reasoning effort (opencode variant) per model; missing = the model's default. */
+  reasoningEffort: Record<string, string>
+  /** Let opencode load Claude Code's skills (~/.claude/skills). */
+  claudeSkills: boolean
+  /** Let opencode load Claude Code's rules (CLAUDE.md, ~/.claude/CLAUDE.md). */
+  claudeRules: boolean
+  /**
+   * The user's opencode config layer, deep-merged over the config the app generates.
+   * Every structured settings screen (permissions, MCP, agents, ...) edits this object.
+   */
+  opencode: OpencodeConfig
+}
+
+/** File-based opencode extensions, stored in the app's private opencode config folder. */
+export type ExtensionKind = 'agent' | 'command' | 'skill' | 'plugin' | 'tool'
+
+export interface ExtensionFile {
+  kind: ExtensionKind
+  /** Agent/command/skill/tool name (file stem; for skills, the folder name). Plugins keep their extension. */
+  name: string
+  path: string
+  content: string
+}
+
+/** What the running opencode server has actually loaded (built-ins, files, MCP, ...). */
+export interface RuntimeInventory {
+  agents: { name: string; description?: string; mode: string; native?: boolean; hidden?: boolean }[]
+  skills: { name: string; description?: string; location: string }[]
+  commands: { name: string; description?: string; source?: string; agent?: string }[]
+  mcp: Record<string, { status: string; error?: string }>
+  tools: string[]
+  lsp: { id: string; name: string; root: string; status: string }[]
+  formatters: { name: string; extensions: string[]; enabled: boolean }[]
+  errors: string[]
 }
 
 export type SaveResult = { ok: true; settings: AppSettings } | { ok: false; error: string }
@@ -71,6 +105,16 @@ export interface CapyApi {
   saveSettings(patch: Partial<AppSettings>): Promise<SaveResult>
   /** The final opencode config the app runs with (base + overrides). */
   getEffectiveConfig(): Promise<unknown>
+  /** Folder holding the app's global opencode files (AGENTS.md, agents/, skills/, ...). */
+  opencodeConfigDir(): Promise<string>
+  inspect(): Promise<RuntimeInventory>
+  listExtensions(kind: ExtensionKind): Promise<ExtensionFile[]>
+  /** Writes an extension file and restarts opencode so it's picked up. */
+  saveExtension(kind: ExtensionKind, name: string, content: string): Promise<void>
+  deleteExtension(kind: ExtensionKind, name: string): Promise<void>
+  getRules(): Promise<string>
+  saveRules(content: string): Promise<void>
+  revealPath(path: string): Promise<void>
   chooseModelsDir(): Promise<string | null>
   listModels(): Promise<InstalledModel[]>
   pullModel(name: string): Promise<void>
@@ -87,7 +131,8 @@ export interface CapyApi {
   getMessages(directory: string, sessionId: string): Promise<StoredMessage[]>
   createSession(directory: string): Promise<Session>
   deleteSession(directory: string, sessionId: string): Promise<void>
-  prompt(directory: string, sessionId: string, text: string): Promise<void>
+  /** Sends a message; text starting with "/name" runs that command. */
+  prompt(directory: string, sessionId: string, text: string, agent?: string): Promise<void>
   abort(directory: string, sessionId: string): Promise<void>
   respondPermission(directory: string, requestId: string, response: PermissionResponse): Promise<void>
   onStatus(cb: (status: RuntimeStatus) => void): () => void
@@ -101,6 +146,14 @@ export const IPC = {
   getSettings: 'settings:get',
   saveSettings: 'settings:save',
   getEffectiveConfig: 'settings:effective-config',
+  opencodeConfigDir: 'opencode:config-dir',
+  inspect: 'opencode:inspect',
+  listExtensions: 'opencode:list-extensions',
+  saveExtension: 'opencode:save-extension',
+  deleteExtension: 'opencode:delete-extension',
+  getRules: 'opencode:get-rules',
+  saveRules: 'opencode:save-rules',
+  revealPath: 'app:reveal-path',
   chooseModelsDir: 'settings:choose-models-dir',
   listModels: 'models:list',
   pullModel: 'models:pull',

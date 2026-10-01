@@ -1,12 +1,13 @@
 import type { ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
-import { app } from 'electron'
 // v2 client: matches the events the 1.18 server actually emits (permission.asked, message.part.delta, ...).
 import { createOpencodeClient, type Config, type OpencodeClient } from '@opencode-ai/sdk/v2'
 import type { AgentEvent, AppSettings, InstalledModel } from '@shared/types'
 import { binDir } from './config'
+import { opencodeHome } from './extensions'
 import { freePort, spawnService, stopProcess, waitFor } from './process'
+import { isPlainObject } from './settings'
 
 export const PROVIDER_ID = 'ollama'
 
@@ -37,26 +38,35 @@ export function buildConfig(settings: AppSettings, ollamaBaseUrl: string, models
               tool_call: m.capabilities.includes('tools'),
               reasoning: m.capabilities.includes('thinking'),
               attachment: m.capabilities.includes('vision'),
-              limit: { context: settings.contextLength, output: settings.maxOutputTokens }
+              limit: { context: settings.contextLength, output: settings.maxOutputTokens },
+              variants: effortVariants(m)
             }
           ])
         )
       }
-    },
-    permission: { ...settings.permissions }
+    }
   }
-  return deepMerge(base, JSON.parse(settings.opencodeOverrides || '{}')) as Config
+  return deepMerge(base, settings.opencode) as Config
+}
+
+/**
+ * One opencode variant per reasoning level Ollama reports for the model (/api/show "thinking").
+ * opencode sends the variant's `reasoningEffort` as `reasoning_effort` on /v1/chat/completions.
+ * Tested against Ollama 0.35: "none" turns thinking off; on on/off models any other value turns it
+ * on (so `true` -> "on"); named levels pass through. Ollama silently ignores values a model doesn't
+ * support, so only reported levels get variants. Models that think but report no levels (e.g.
+ * deepseek-r1) ignore reasoning_effort entirely and get none.
+ */
+export function effortVariants(m: InstalledModel): Record<string, { reasoningEffort: string }> | undefined {
+  const levels = (m.thinking?.values ?? []).map((v): [string, string] => (v === false ? ['off', 'none'] : v === true ? ['on', 'medium'] : [v, v]))
+  return levels.length ? Object.fromEntries(levels.map(([name, effort]) => [name, { reasoningEffort: effort }])) : undefined
 }
 
 function deepMerge(target: unknown, source: unknown): unknown {
-  if (!isObject(target) || !isObject(source)) return source
+  if (!isPlainObject(target) || !isPlainObject(source)) return source
   const out: Record<string, unknown> = { ...target }
   for (const [key, value] of Object.entries(source)) out[key] = key in out ? deepMerge(out[key], value) : value
   return out
-}
-
-function isObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
 }
 
 /**
@@ -73,15 +83,16 @@ export class OpencodeRuntime {
   baseUrl = ''
   client!: OpencodeClient
 
-  async start(config: Config): Promise<void> {
+  async start(config: Config, env: NodeJS.ProcessEnv = {}): Promise<void> {
     const port = await freePort()
     this.baseUrl = `http://127.0.0.1:${port}`
     // Keep opencode's data/config private to the app so it never collides with
     // (or reads config from) a user's own opencode install.
-    const home = join(app.getPath('userData'), 'opencode')
+    const home = opencodeHome()
     this.proc = spawnService('opencode', join(binDir(), 'opencode'), ['serve', '--hostname=127.0.0.1', `--port=${port}`], {
       env: {
         ...process.env,
+        ...env,
         OPENCODE_CONFIG_CONTENT: JSON.stringify(config),
         OPENCODE_SERVER_PASSWORD: this.password,
         XDG_DATA_HOME: join(home, 'data'),

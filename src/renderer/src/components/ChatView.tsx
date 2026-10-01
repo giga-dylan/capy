@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import type { PermissionRequest } from '@opencode-ai/sdk/v2'
 import type { PermissionResponse } from '@shared/types'
 import { basename } from '../paths'
+import { useInventory } from '../models'
 import { useSession } from '../useSession'
 import logo from '../assets/capy.svg'
 import { ArrowUpIcon, CheckIcon, ChevronDownIcon, FolderIcon, PlusIcon, StopIcon } from './icons'
 import { MessageView, PermissionCard } from './Messages'
+import { EffortPicker } from './EffortPicker'
 import { ModelPicker } from './ModelPicker'
 import type { ActiveChat } from './Shell'
 
@@ -14,13 +16,17 @@ interface Props {
   projects: string[]
   active: ActiveChat
   model: string
+  /** Selected primary agent; undefined = opencode's default agent. */
+  agent?: string
+  onChangeAgent: (agent: string | undefined) => void
   onOpenSettings: () => void
   onChangeDirectory: (dir: string) => void
   onAddProject: () => Promise<string | null>
   onSessionCreated: (sessionId: string) => void
 }
 
-export function ChatView({ chatsDir, projects, active, model, onOpenSettings, onChangeDirectory, onAddProject, onSessionCreated }: Props): React.JSX.Element {
+export function ChatView(props: Props): React.JSX.Element {
+  const { chatsDir, projects, active, model, agent, onChangeAgent, onOpenSettings, onChangeDirectory, onAddProject, onSessionCreated } = props
   const { directory, sessionId } = active
   const { messages, permissions, busy, error } = useSession(directory, sessionId)
   const [input, setInput] = useState('')
@@ -28,6 +34,10 @@ export function ChatView({ chatsDir, projects, active, model, onOpenSettings, on
   const [sendError, setSendError] = useState<string>()
   const bottom = useRef<HTMLDivElement>(null)
   const isProject = directory !== chatsDir
+  const inventory = useInventory()
+  // "/partial" with no space yet: suggest matching commands.
+  const slash = /^\/(\S*)$/.exec(input)
+  const suggestions = slash ? (inventory?.commands ?? []).filter((c) => c.name.startsWith(slash[1])).slice(0, 8) : []
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: 'end' })
@@ -43,12 +53,12 @@ export function ChatView({ chatsDir, projects, active, model, onOpenSettings, on
       // with the new session id, and that instance's prompt is sent below.
       if (!sessionId) {
         const session = await window.api.createSession(directory)
-        pendingPrompt.set(session.id, text)
+        pendingPrompt.set(session.id, { text, agent })
         onSessionCreated(session.id)
         return
       }
       setInput('')
-      await window.api.prompt(directory, sessionId, text)
+      await window.api.prompt(directory, sessionId, text, agent)
     } catch (err) {
       setSendError(String(err))
     } finally {
@@ -59,17 +69,17 @@ export function ChatView({ chatsDir, projects, active, model, onOpenSettings, on
   // Send the first message of a just-created session (after useSession has subscribed).
   useEffect(() => {
     if (!sessionId) return
-    const text = pendingPrompt.get(sessionId)
-    if (text === undefined) return
+    const pending = pendingPrompt.get(sessionId)
+    if (!pending) return
     pendingPrompt.delete(sessionId)
-    window.api.prompt(directory, sessionId, text).catch((err) => setSendError(String(err)))
+    window.api.prompt(directory, sessionId, pending.text, pending.agent).catch((err) => setSendError(String(err)))
   }, [directory, sessionId])
 
   const respond = (p: PermissionRequest, r: PermissionResponse): Promise<void> => window.api.respondPermission(directory, p.id, r)
   const empty = messages.length === 0 && !sessionId
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
+    <main className="flex min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-neutral-950">
       <div className="drag h-12 shrink-0" />
 
       {empty ? (
@@ -113,23 +123,46 @@ export function ChatView({ chatsDir, projects, active, model, onOpenSettings, on
               onAddProject={onAddProject}
             />
           </div>
+          {suggestions.length > 0 && (
+            <ul className="border-b border-neutral-200 py-1 dark:border-neutral-800">
+              {suggestions.map((c, i) => (
+                <li key={c.name}>
+                  <button
+                    onClick={() => setInput(`/${c.name} `)}
+                    className={`flex w-full items-baseline gap-3 px-4 py-1 text-left text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800 ${i === 0 ? 'bg-neutral-100/70 dark:bg-neutral-800/60' : ''}`}
+                  >
+                    <span className="font-mono text-xs">/{c.name}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-neutral-500">{c.description}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <textarea
             autoFocus
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
+              // Tab completes the first suggested /command.
+              if (e.key === 'Tab' && suggestions.length) {
+                e.preventDefault()
+                setInput(`/${suggestions[0].name} `)
+                return
+              }
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault()
                 send()
               }
             }}
             rows={2}
-            placeholder={isProject ? `Ask anything about ${basename(directory)}…` : 'Ask anything…'}
+            placeholder={isProject ? `Ask anything about ${basename(directory)}… (/ for commands)` : 'Ask anything… (/ for commands)'}
             className="block max-h-60 w-full resize-none bg-transparent px-4 pt-3 text-sm outline-none [field-sizing:content] placeholder:text-neutral-400"
           />
           <div className="flex items-center gap-2 px-3 pb-3">
+            <AgentPicker agents={(inventory?.agents ?? []).filter((a) => a.mode !== 'subagent' && !a.hidden)} agent={agent} onChange={onChangeAgent} />
             <span className="flex-1" />
             <ModelPicker model={model} onOpenSettings={onOpenSettings} />
+            <EffortPicker model={model} />
             {busy ? (
               <button
                 onClick={() => sessionId && window.api.abort(directory, sessionId)}
@@ -156,7 +189,7 @@ export function ChatView({ chatsDir, projects, active, model, onOpenSettings, on
 }
 
 /** First prompts for sessions created by a ChatView that's about to be replaced (re-keyed). */
-const pendingPrompt = new Map<string, string>()
+const pendingPrompt = new Map<string, { text: string; agent?: string }>()
 
 function FolderPicker({
   chatsDir,
@@ -242,5 +275,52 @@ function MenuItem({
       <span className="flex-1" />
       {selected && <CheckIcon className="size-3.5 text-blue-500" />}
     </button>
+  )
+}
+
+function AgentPicker({
+  agents,
+  agent,
+  onChange
+}: {
+  agents: { name: string; description?: string }[]
+  agent?: string
+  onChange: (agent: string | undefined) => void
+}): React.JSX.Element | null {
+  const [open, setOpen] = useState(false)
+  if (!agents.length) return null
+  const current = agent ?? agents[0]?.name
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        title="Agent"
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-500 capitalize hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
+      >
+        {current} <ChevronDownIcon className="size-3" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-lg border border-neutral-200 bg-white p-1 text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+            {agents.map((a) => (
+              <MenuItem
+                key={a.name}
+                selected={a.name === current}
+                onClick={() => {
+                  setOpen(false)
+                  onChange(a.name)
+                }}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block capitalize">{a.name}</span>
+                  {a.description && <span className="block truncate text-xs text-neutral-500">{a.description}</span>}
+                </span>
+              </MenuItem>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

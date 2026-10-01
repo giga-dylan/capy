@@ -1,11 +1,22 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { IPC, type AppSettings, type InstalledModel, type ModelProgress, type PermissionResponse, type RuntimeStatus, type SaveResult } from '@shared/types'
+import {
+  IPC,
+  type AppSettings,
+  type ExtensionKind,
+  type InstalledModel,
+  type ModelProgress,
+  type PermissionResponse,
+  type RuntimeInventory,
+  type RuntimeStatus,
+  type SaveResult
+} from '@shared/types'
 import { OllamaRuntime } from './ollama'
-import { buildConfig, OpencodeRuntime, PROVIDER_ID } from './opencode'
+import { buildConfig, effortVariants, OpencodeRuntime, PROVIDER_ID } from './opencode'
 import { chatsDirectory, ProjectStore } from './projects'
-import { loadSettings, saveSettings, validateOverrides } from './settings'
+import { deleteExtension, listExtensions, opencodeConfigDir, readRules, writeExtension, writeRules } from './extensions'
+import { isPlainObject, loadSettings, saveSettings } from './settings'
 
 const ollama = new OllamaRuntime()
 const opencode = new OpencodeRuntime()
@@ -55,7 +66,10 @@ async function startOllama(restart = false): Promise<void> {
 async function startOpencode(restart = false): Promise<void> {
   setStatus({ opencode: 'starting', error: undefined })
   if (restart) await opencode.stop()
-  await opencode.start(buildConfig(settings, ollama.baseUrl, models))
+  await opencode.start(buildConfig(settings, ollama.baseUrl, models), {
+    ...(!settings.claudeSkills && { OPENCODE_DISABLE_CLAUDE_CODE_SKILLS: '1' }),
+    ...(!settings.claudeRules && { OPENCODE_DISABLE_CLAUDE_CODE_PROMPT: '1' })
+  })
   setStatus({ opencode: 'ready' })
   opencode
     .streamEvents((directory, event) => win?.webContents.send(IPC.agentEvent, directory, event))
@@ -78,6 +92,42 @@ function bootRuntimes(): Promise<void> {
   }).catch(reportFailure)
 }
 
+/** opencode reads config and extension files at startup, so changes need a restart. */
+const restartOpencode = (): Promise<void> => serially(() => startOpencode(true))
+
+/** What the running server has loaded, as seen from the no-folder chats workspace. */
+async function inspect(): Promise<RuntimeInventory> {
+  const directory = chatsDirectory()
+  const c = opencode.client
+  const [agents, skills, commands, mcp, tools, lsp, formatters] = await Promise.allSettled([
+    c.app.agents({ directory }),
+    c.app.skills({ directory }),
+    c.command.list({ directory }),
+    c.mcp.status({ directory }),
+    c.tool.ids({ directory }),
+    c.lsp.status({ directory }),
+    c.formatter.status({ directory })
+  ])
+  const errors: string[] = []
+  const value = <T>(r: PromiseSettledResult<{ data?: T }>, fallback: T): T => {
+    if (r.status === 'fulfilled') return r.value.data ?? fallback
+    errors.push(String(r.reason))
+    return fallback
+  }
+  return {
+    agents: value(agents, []).map(({ name, description, mode, native, hidden }) => ({ name, description, mode, native, hidden })),
+    skills: value(skills, []).map(({ name, description, location }) => ({ name, description, location })),
+    commands: value(commands, []).map(({ name, description, source, agent }) => ({ name, description, source, agent })),
+    mcp: Object.fromEntries(
+      Object.entries(value(mcp, {})).map(([name, st]) => [name, { status: st.status, error: 'error' in st ? st.error : undefined }])
+    ),
+    tools: value(tools, []),
+    lsp: value(lsp, []),
+    formatters: value(formatters, []),
+    errors
+  }
+}
+
 /** opencode needs a restart to see added/removed models. */
 const afterModelsChanged = (): Promise<void> =>
   serially(async () => {
@@ -86,15 +136,14 @@ const afterModelsChanged = (): Promise<void> =>
   })
 
 async function applySettings(patch: Partial<AppSettings>): Promise<SaveResult> {
-  const next: AppSettings = { ...settings, ...patch, permissions: { ...settings.permissions, ...patch.permissions } }
-  const overridesError = validateOverrides(next.opencodeOverrides)
-  if (overridesError) return { ok: false, error: overridesError }
+  const next: AppSettings = { ...settings, ...patch }
+  if (!isPlainObject(next.opencode)) return { ok: false, error: 'The opencode config must be a JSON object.' }
   if (!(next.contextLength >= 2048) || !(next.maxOutputTokens >= 256)) return { ok: false, error: 'Context must be ≥ 2048 and output ≥ 256 tokens.' }
 
   const changed = (keys: (keyof AppSettings)[]): boolean => keys.some((k) => JSON.stringify(next[k]) !== JSON.stringify(settings[k]))
   const restartOllama = changed(['modelsDir', 'contextLength'])
   // The active model is sent with each prompt, so switching it needs no restart.
-  const restartOpencode = restartOllama || changed(['maxOutputTokens', 'permissions', 'opencodeOverrides'])
+  const restartOpencode = restartOllama || changed(['maxOutputTokens', 'opencode', 'claudeSkills', 'claudeRules'])
 
   settings = next
   saveSettings(settings)
@@ -129,6 +178,24 @@ function registerIpc(): void {
   ipcMain.handle(IPC.getSettings, () => settings)
   ipcMain.handle(IPC.saveSettings, (_e, patch: Partial<AppSettings>) => applySettings(patch))
   ipcMain.handle(IPC.getEffectiveConfig, () => buildConfig(settings, ollama.baseUrl, models))
+  ipcMain.handle(IPC.opencodeConfigDir, () => opencodeConfigDir())
+  ipcMain.handle(IPC.inspect, () => inspect())
+  ipcMain.handle(IPC.listExtensions, (_e, kind: ExtensionKind) => listExtensions(kind))
+  ipcMain.handle(IPC.saveExtension, async (_e, kind: ExtensionKind, name: string, content: string) => {
+    writeExtension(kind, name, content)
+    await restartOpencode()
+  })
+  ipcMain.handle(IPC.deleteExtension, async (_e, kind: ExtensionKind, name: string) => {
+    deleteExtension(kind, name)
+    await restartOpencode()
+  })
+  ipcMain.handle(IPC.getRules, () => readRules())
+  ipcMain.handle(IPC.saveRules, async (_e, content: string) => {
+    writeRules(content)
+    await restartOpencode()
+  })
+  ipcMain.handle(IPC.revealPath, (_e, path: string) => shell.showItemInFolder(path))
+
   ipcMain.handle(IPC.chooseModelsDir, async () => {
     const res = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], message: 'Choose where Ollama stores models' })
     return res.canceled ? null : res.filePaths[0]
@@ -203,14 +270,25 @@ function registerIpc(): void {
     await opencode.client.session.delete({ directory, sessionID })
   })
 
-  // promptAsync returns immediately; progress arrives on the event stream.
-  ipcMain.handle(IPC.prompt, async (_e, directory: string, sessionID: string, text: string) => {
-    await opencode.client.session.promptAsync({
-      directory,
-      sessionID,
-      model: { providerID: PROVIDER_ID, modelID: settings.model },
-      parts: [{ type: 'text', text }]
-    })
+  // Both return immediately; progress arrives on the event stream.
+  ipcMain.handle(IPC.prompt, async (_e, directory: string, sessionID: string, text: string, agent?: string) => {
+    const model = { providerID: PROVIDER_ID, modelID: settings.model }
+    // Only send a variant the active model actually has (efforts are saved per model).
+    const active = models.find((m) => m.name === settings.model)
+    const effort = settings.reasoningEffort[settings.model]
+    const variant = active && effort && effortVariants(active)?.[effort] ? effort : undefined
+    const slash = /^\/(\S+)\s*([\s\S]*)$/.exec(text.trim())
+    if (slash) {
+      const { data: commands } = await opencode.client.command.list({ directory })
+      if (commands?.some((c) => c.name === slash[1])) {
+        // Fire and forget: session.command resolves only when the run finishes.
+        void opencode.client.session
+          .command({ directory, sessionID, command: slash[1], arguments: slash[2], agent, variant, model: `${PROVIDER_ID}/${settings.model}` })
+          .catch((err) => console.error('[opencode] command failed', err))
+        return
+      }
+    }
+    await opencode.client.session.promptAsync({ directory, sessionID, agent, model, variant, parts: [{ type: 'text', text }] })
   })
 
   ipcMain.handle(IPC.abort, async (_e, directory: string, sessionID: string) => {

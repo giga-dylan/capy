@@ -34,22 +34,36 @@ Renderer (React + Tailwind)
 
 ## Settings
 
-Everything is configurable in the app (sidebar → **Settings**) and saved to
-`~/Library/Application Support/Capy/settings.json`:
+Sidebar → **Settings** surfaces everything opencode supports:
 
-- **Models**: install from a recommended list or any `ollama.com/library` tag, import an MLX/safetensors
-  folder (e.g. from LM Studio) or a `.gguf` file, set the active model, delete models. The chat box also
-  has a model picker. Models without tool support are flagged (they can't run agent tools).
-- **Model storage**: Ollama's model folder (`OLLAMA_MODELS`); default `~/.ollama/models`.
-- **Agent permissions**: ask / allow / deny for file edits, shell commands, web fetches, and access
-  outside the chat's folder.
-- **Limits**: context window and max output tokens.
-- **Advanced**: a JSON object deep-merged over the generated opencode config (see
-  [opencode.ai/docs/config](https://opencode.ai/docs/config/)), plus a view of the final config.
+| Tab | What it edits |
+|---|---|
+| Models & general | Install/import/delete/switch models, title/summary model (`small_model`), model folder, context + output limits |
+| Permissions | All opencode permission keys (ask/allow/deny) with per-pattern rules |
+| Rules | Global `AGENTS.md`, extra instruction files/URLs, Claude Code `CLAUDE.md` toggle |
+| Agents | Built-in + custom agents, default agent, disable built-ins, per-agent overrides (model, thinking, temperature, top_p, steps, prompt, permissions), subagent depth, `agents/*.md` editor |
+| Commands | All commands, `commands/*.md` editor (run in chat as `/name args`) |
+| Skills | Loaded skills by source, `skills/<name>/SKILL.md` editor, extra skill folders/URLs, Claude Code skills toggle |
+| MCP servers | Add/edit local or remote servers (env/headers, cwd, timeout, OAuth) with live status |
+| Plugins & hooks | `plugins/*.ts` editor (hook template) and npm plugins |
+| Tools | Enable/disable each tool, `tools/*.ts` custom tools editor |
+| Formatters & LSP | Turn formatters/language servers on (off by default in opencode), per-tool toggles, custom ones |
+| Advanced | Compaction, tool output limits, image limits, snapshots, shell, username, log level, watcher ignores, experimental flags, references, managed keys, the full JSON layer, and the final config |
 
-Saving restarts opencode (and Ollama when storage or context changes); switching the active model doesn't.
-The generated config always pins opencode to the bundled Ollama (`enabled_providers: ["ollama"]`), so
-titles and summaries never go to a cloud provider.
+How it's stored:
+
+- `~/Library/Application Support/Capy/settings.json`: app settings plus `opencode`, a JSON layer deep-merged
+  over the config Capy generates. Every structured screen edits this one object.
+- `~/Library/Application Support/Capy/opencode/config/opencode/`: opencode's global config folder for Capy
+  (`AGENTS.md`, `agents/`, `commands/`, `skills/`, `plugins/`, `tools/`). Projects can add their own
+  `AGENTS.md` and `.opencode/` folders as usual.
+- Claude Code compatibility (`~/.claude/skills`, `CLAUDE.md`) is **off by default** so Capy only uses what's
+  configured in Capy and prompts stay small for local models.
+
+Thinking levels come from Ollama per model (`/api/show`), so only levels a model actually supports are offered.
+
+Saving restarts opencode (and Ollama when storage or context changes); switching the model or agent doesn't.
+The generated config always pins opencode to the bundled Ollama (`enabled_providers: ["ollama"]`).
 
 ## Release
 

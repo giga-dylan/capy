@@ -13,6 +13,8 @@ html,
 body,
 #root {
   height: 100%;
+  /* The app scrolls inside its panes; the window itself never scrolls. */
+  overflow: hidden;
 }
 
 body {

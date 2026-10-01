@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RuntimeStatus, Session } from '@shared/types'
 import { ChatView } from './ChatView'
-import { Settings } from './Settings'
+import { SettingsPage } from './settings/SettingsPage'
 import { Sidebar } from './Sidebar'
 
 export interface ActiveChat {
@@ -18,11 +18,18 @@ export function Shell({ status }: { status: RuntimeStatus }): React.JSX.Element 
   const [sessions, setSessions] = useState<Record<string, Session[]>>({})
   const [active, setActive] = useState<ActiveChat>()
   const [view, setView] = useState<'chat' | 'settings'>('chat')
+  const [agent, setAgent] = useState<string>()
 
+  // Fails harmlessly while the agent engine restarts; the effect below reloads once it's back.
   const loadSessions = useCallback(async (dir: string) => {
-    const list = await window.api.listSessions(dir)
-    setSessions((s) => ({ ...s, [dir]: list }))
+    const list = await window.api.listSessions(dir).catch(() => undefined)
+    if (list) setSessions((s) => ({ ...s, [dir]: list }))
   }, [])
+
+  const engineReady = status.opencode === 'ready'
+  useEffect(() => {
+    if (engineReady && chatsDir) for (const dir of [chatsDir, ...projects]) loadSessions(dir)
+  }, [engineReady, chatsDir, projects, loadSessions])
 
   useEffect(() => {
     Promise.all([window.api.chatsDirectory(), window.api.listProjects()]).then(([chats, projs]) => {
@@ -87,10 +94,10 @@ export function Shell({ status }: { status: RuntimeStatus }): React.JSX.Element 
         onRemoveProject={removeProject}
         onDeleteChat={deleteChat}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <StatusBanner status={status} />
         {view === 'settings' ? (
-          <Settings onBack={() => setView('chat')} />
+          <SettingsPage onBack={() => setView('chat')} />
         ) : (
           <ChatView
             key={active.sessionId ?? `new:${active.directory}`}
@@ -98,6 +105,8 @@ export function Shell({ status }: { status: RuntimeStatus }): React.JSX.Element 
             projects={projects}
             active={active}
             model={status.model}
+            agent={agent}
+            onChangeAgent={setAgent}
             onOpenSettings={() => setView('settings')}
             onChangeDirectory={(directory) => setActive({ directory })}
             onAddProject={addProject}

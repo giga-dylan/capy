@@ -54,15 +54,28 @@ export class OllamaRuntime {
     const { models } = (await res.json()) as {
       models: { name: string; size: number; details: { format: string; quantization_level: string }; capabilities?: string[] }[]
     }
-    return models
-      .map((m) => ({
+    const list = await Promise.all(
+      models.map(async (m) => ({
         name: m.name,
         size: m.size,
         format: m.details.format,
         quantization: m.details.quantization_level,
-        capabilities: m.capabilities ?? []
+        capabilities: m.capabilities ?? [],
+        thinking: m.capabilities?.includes('thinking') ? await this.thinkingLevels(m.name) : undefined
       }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    )
+    return list.sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  /** /api/show reports which `think` values a model accepts, e.g. { values: [false, "low", "high"], default: "medium" }. */
+  private async thinkingLevels(model: string): Promise<InstalledModel['thinking']> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/show`, { method: 'POST', body: JSON.stringify({ model }) })
+      const { thinking } = (await res.json()) as { thinking?: InstalledModel['thinking'] }
+      return thinking?.values?.length ? thinking : undefined
+    } catch {
+      return undefined
+    }
   }
 
   /** Streams /api/pull (newline-delimited JSON) and reports progress. */

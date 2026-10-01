@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { InstalledModel, ModelProgress } from '@shared/types'
 import { formatBytes, progressPercent, RECOMMENDED_MODELS, supportsTools, useInstalledModels, useModelProgress } from '../models'
+import { levelLabel, levelName } from './EffortPicker'
 import { CheckIcon, DownloadIcon, FolderIcon, TrashIcon } from './icons'
 
 const btn = 'rounded-md px-3 py-1.5 text-xs font-medium disabled:opacity-40'
@@ -150,6 +151,13 @@ function InstalledRow({
           {formatBytes(model.size)} · {model.quantization} · {model.capabilities.filter((c) => c !== 'completion').join(', ') || 'text only'}
           {!supportsTools(model) && <span className="text-amber-500"> · no tool support (can't run agent tools)</span>}
         </p>
+        {model.capabilities.includes('thinking') && (
+          <p className="text-xs text-neutral-500">
+            {model.thinking
+              ? `Thinking: ${model.thinking.values.map((v) => levelLabel(levelName(v))).join(', ')}${model.thinking.default !== undefined ? ` (default ${levelLabel(levelName(model.thinking.default)).toLowerCase()})` : ''}`
+              : 'Thinking: always on (not adjustable)'}
+          </p>
+        )}
       </div>
       {active ? (
         <span className="text-xs text-blue-500">Active</span>

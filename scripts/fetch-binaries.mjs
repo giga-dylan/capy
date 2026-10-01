@@ -22,6 +22,16 @@ if (!existsSync(join(root, 'node_modules', 'electron', 'dist'))) {
   execFileSync('node', [join(root, 'node_modules', 'electron', 'install.js')], { stdio: 'inherit' })
 }
 
+// In dev the app runs inside Electron's stock bundle, so macOS shows "Electron" in the menu bar
+// and Dock. Rename that bundle to the product name (packaged builds get it from electron-builder).
+const devPlist = join(root, 'node_modules', 'electron', 'dist', 'Electron.app', 'Contents', 'Info.plist')
+if (existsSync(devPlist)) {
+  for (const key of ['CFBundleName', 'CFBundleDisplayName']) {
+    execFileSync('plutil', ['-replace', key, '-string', pkg.productName, devPlist])
+  }
+  console.log(`[fetch-binaries] dev Electron bundle renamed to ${pkg.productName}`)
+}
+
 const wanted = JSON.stringify(pkg.binaries)
 if (existsSync(stampFile) && readFileSync(stampFile, 'utf8') === wanted) {
   console.log('[fetch-binaries] up to date')
