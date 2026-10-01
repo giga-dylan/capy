@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AppSettings } from '@shared/types'
 import { useInstalledModels } from '../models'
-import { CheckIcon, ChevronDownIcon } from './icons'
+import { CheckIcon, ChevronDownIcon, GaugeIcon } from './icons'
 
 /** Ollama's levels as opencode variant names (see effortVariants in src/main/opencode.ts). */
 export const levelName = (v: string | boolean): string => (v === false ? 'off' : v === true ? 'on' : v)
@@ -29,8 +29,9 @@ export function EffortPicker({ model }: { model: string }): React.JSX.Element | 
   // Thinking models that report no levels (e.g. deepseek-r1) always think and ignore the setting.
   if (!levels.length) {
     return (
-      <span title="This model always thinks; it doesn't support changing reasoning effort." className="px-2 py-1 text-xs text-neutral-500">
-        <span className="text-neutral-400">Thinking</span> always on
+      <span title="Thinking: always on. This model doesn't support changing reasoning effort." className="flex items-center gap-1 px-2 py-1 text-xs text-neutral-500">
+        <GaugeIcon className="size-3.5 shrink-0" />
+        <span className="hidden whitespace-nowrap @xl:inline">always on</span>
       </span>
     )
   }
@@ -52,11 +53,12 @@ export function EffortPicker({ model }: { model: string }): React.JSX.Element | 
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        title="Reasoning effort"
+        title={`Reasoning effort: ${levelLabel(current ?? defaultLevel ?? 'default').toLowerCase()}`}
         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
       >
-        <span className="text-neutral-400">Thinking</span> {levelLabel(current ?? defaultLevel ?? 'default').toLowerCase()}
-        <ChevronDownIcon className="size-3" />
+        <GaugeIcon className="size-3.5 shrink-0" />
+        <span className="hidden whitespace-nowrap @xl:inline">{levelLabel(current ?? defaultLevel ?? 'default').toLowerCase()}</span>
+        <ChevronDownIcon className="size-3 shrink-0" />
       </button>
       {open && (
         <>

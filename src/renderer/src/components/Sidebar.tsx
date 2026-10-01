@@ -2,18 +2,21 @@ import { useState } from 'react'
 import type { Session } from '@shared/types'
 import logo from '../assets/capy.svg'
 import { basename } from '../paths'
-import { FolderIcon, NewChatIcon, PlusIcon, SettingsIcon, TrashIcon, XIcon } from './icons'
-import type { ActiveChat } from './Shell'
+import { BranchIcon, FolderIcon, NewChatIcon, PencilIcon, PlusIcon, SettingsIcon, TrashIcon, XIcon } from './icons'
+import type { ActiveChat, Worktree } from './Shell'
 
 interface Props {
   chatsDir: string
   projects: string[]
+  worktrees: Record<string, Worktree[]>
   sessions: Record<string, Session[]>
   active: ActiveChat
   onSelect: (chat: ActiveChat) => void
   onAddProject: () => Promise<string | null>
   onRemoveProject: (dir: string) => void
+  onRemoveWorktree: (project: string, dir: string) => void
   onDeleteChat: (dir: string, id: string) => void
+  onRenameChat: (dir: string, id: string, title: string) => void
   onOpenSettings: () => void
   settingsOpen: boolean
 }
@@ -62,7 +65,7 @@ export function Sidebar(props: Props): React.JSX.Element {
 
         <section>
           <h2 className="px-2 pb-1 text-xs font-medium text-neutral-500">Chats</h2>
-          <SessionList dir={chatsDir} list={sessions[chatsDir] ?? []} active={active} onSelect={onSelect} onDelete={props.onDeleteChat} />
+          <SessionList dir={chatsDir} list={sessions[chatsDir] ?? []} active={active} onSelect={onSelect} onDelete={props.onDeleteChat} onRename={props.onRenameChat} />
         </section>
       </div>
       <div className="border-t border-neutral-200 p-2 dark:border-neutral-800">
@@ -77,7 +80,7 @@ export function Sidebar(props: Props): React.JSX.Element {
   )
 }
 
-function ProjectGroup({ dir, sessions, active, onSelect, onRemoveProject, onDeleteChat }: Props & { dir: string }): React.JSX.Element {
+function ProjectGroup({ dir, sessions, worktrees, active, onSelect, onRemoveProject, onRemoveWorktree, onDeleteChat, onRenameChat }: Props & { dir: string }): React.JSX.Element {
   const selected = active.directory === dir && !active.sessionId
   return (
     <div className="mb-1">
@@ -96,7 +99,28 @@ function ProjectGroup({ dir, sessions, active, onSelect, onRemoveProject, onDele
         </button>
       </div>
       <div className="pl-5">
-        <SessionList dir={dir} list={sessions[dir] ?? []} active={active} onSelect={onSelect} onDelete={onDeleteChat} />
+        <SessionList dir={dir} list={sessions[dir] ?? []} active={active} onSelect={onSelect} onDelete={onDeleteChat} onRename={onRenameChat} />
+        {(worktrees[dir] ?? []).map((w) => (
+          <div key={w.directory}>
+            <div
+              className={`group flex items-center gap-2 rounded-md px-2 py-1 text-xs ${active.directory === w.directory && !active.sessionId ? 'bg-neutral-200 dark:bg-neutral-800' : 'hover:bg-neutral-200/70 dark:hover:bg-neutral-800/70'}`}
+            >
+              <button onClick={() => onSelect({ directory: w.directory })} title={`Worktree: ${w.directory}`} className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-neutral-600 dark:text-neutral-400">
+                <BranchIcon className="size-3.5 shrink-0" /> <span className="truncate font-mono">{w.branch ?? w.name}</span>
+              </button>
+              <button
+                onClick={() => onRemoveWorktree(dir, w.directory)}
+                title="Delete this worktree (its folder and uncommitted changes)"
+                className="hidden rounded p-0.5 text-neutral-500 group-hover:block hover:text-red-500"
+              >
+                <TrashIcon className="size-3.5" />
+              </button>
+            </div>
+            <div className="pl-4">
+              <SessionList dir={w.directory} list={sessions[w.directory] ?? []} active={active} onSelect={onSelect} onDelete={onDeleteChat} onRename={onRenameChat} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -107,15 +131,18 @@ function SessionList({
   list,
   active,
   onSelect,
-  onDelete
+  onDelete,
+  onRename
 }: {
   dir: string
   list: Session[]
   active: ActiveChat
   onSelect: (chat: ActiveChat) => void
   onDelete: (dir: string, id: string) => void
+  onRename: (dir: string, id: string, title: string) => void
 }): React.JSX.Element {
   const [expanded, setExpanded] = useState(false)
+  const [renaming, setRenaming] = useState<{ id: string; title: string }>()
   const shown = expanded ? list : list.slice(0, COLLAPSED_COUNT)
   return (
     <ul>
@@ -124,8 +151,36 @@ function SessionList({
           <div
             className={`group flex items-center rounded-md px-2 py-1.5 text-sm ${active.sessionId === s.id ? 'bg-neutral-200 dark:bg-neutral-800' : 'hover:bg-neutral-200/70 dark:hover:bg-neutral-800/70'}`}
           >
-            <button onClick={() => onSelect({ directory: dir, sessionId: s.id })} className="min-w-0 flex-1 truncate text-left">
-              {s.title || 'Untitled'}
+            {renaming?.id === s.id ? (
+              <input
+                autoFocus
+                value={renaming.title}
+                onChange={(e) => setRenaming({ id: s.id, title: e.target.value })}
+                onBlur={() => setRenaming(undefined)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setRenaming(undefined)
+                  if (e.key === 'Enter' && renaming.title.trim()) {
+                    onRename(dir, s.id, renaming.title.trim())
+                    setRenaming(undefined)
+                  }
+                }}
+                className="min-w-0 flex-1 rounded bg-white px-1 text-sm outline-none dark:bg-neutral-950"
+              />
+            ) : (
+              <button
+                onClick={() => onSelect({ directory: dir, sessionId: s.id })}
+                onDoubleClick={() => setRenaming({ id: s.id, title: s.title })}
+                className="min-w-0 flex-1 truncate text-left"
+              >
+                {s.title || 'Untitled'}
+              </button>
+            )}
+            <button
+              onClick={() => setRenaming({ id: s.id, title: s.title })}
+              title="Rename (or double-click)"
+              className="hidden rounded p-0.5 text-neutral-500 group-hover:block hover:text-neutral-900 dark:hover:text-white"
+            >
+              <PencilIcon className="size-3.5" />
             </button>
             <button
               onClick={() => onDelete(dir, s.id)}

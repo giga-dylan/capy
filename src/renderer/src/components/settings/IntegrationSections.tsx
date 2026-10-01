@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { SaveResult } from '@shared/types'
 import { PlusIcon, TrashIcon } from '../icons'
 import { ensure, obj, prune, strings, useSettings } from './context'
@@ -58,8 +58,100 @@ function fromForm(f: McpForm, previous?: McpServer): McpServer {
     : { type: 'remote', url: f.url.trim(), ...(f.pairs.trim() && { headers: parsePairs(f.pairs, ':') }), ...(!f.oauth && { oauth: false as const }), ...common }
 }
 
+/** Built-in browser use: the bundled Playwright MCP server, driving the user's Chrome. */
+function BrowserCard(): React.JSX.Element {
+  const { settings, inventory, save } = useSettings()
+  const status = inventory?.mcp.browser?.status
+  return (
+    <Section
+      title="Browser"
+      description="Lets the agent open pages, click, fill forms and read sites in Google Chrome, using Microsoft’s Playwright MCP (bundled with Capy). It uses a separate Chrome profile, so your own browsing stays private."
+      actions={<Toggle checked={settings.browser.enabled} onChange={(enabled) => save({ browser: { ...settings.browser, enabled } })} />}
+    >
+      {settings.browser.enabled && (
+        <div className={list}>
+          <div className="flex items-center gap-3 px-3 py-2.5">
+            <div className="flex-1">
+              <p className="text-sm">Show the browser window</p>
+              <p className="text-xs text-neutral-500">Watch the agent browse. Off runs Chrome invisibly.</p>
+            </div>
+            <Toggle checked={!settings.browser.headless} onChange={(show) => save({ browser: { ...settings.browser, headless: !show } })} />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-neutral-500">
+            Status:
+            {status ? <Badge tone={status === 'connected' ? 'green' : 'red'}>{status.replace(/_/g, ' ')}</Badge> : <Badge>starting</Badge>}
+            {inventory && !inventory.chromeInstalled && <span className="text-amber-500">Google Chrome isn’t installed. Install it to use the browser.</span>}
+          </div>
+        </div>
+      )}
+    </Section>
+  )
+}
+
 export function McpSection(): React.JSX.Element {
-  const { settings, inventory, updateOpencode } = useSettings()
+  return (
+    <div className="space-y-10">
+      <BrowserCard />
+      <McpServers />
+    </div>
+  )
+}
+
+interface McpResource {
+  name: string
+  uri: string
+  description?: string
+  client: string
+}
+
+/** Sign in / out / reconnect for one MCP server (opencode mcp.auth.*, mcp.connect). */
+function McpActions({ name, status, remote, onDone }: { name: string; status?: string; remote: boolean; onDone: () => void }): React.JSX.Element | null {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
+  const act = async (method: 'mcp.auth.authenticate' | 'mcp.auth.remove' | 'mcp.connect'): Promise<void> => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      await window.api.oc(method, { directory: await window.api.chatsDirectory(), name })
+    } catch (err) {
+      setError(String(err).replace(/^Error: (Error invoking remote method '[^']+': )?(Error: )?/, ''))
+    }
+    setBusy(false)
+    onDone()
+  }
+  const needsAuth = status === 'needs_auth' || status === 'needs_client_registration'
+  return (
+    <>
+      {needsAuth && (
+        <button disabled={busy} onClick={() => act('mcp.auth.authenticate')} title="Opens the sign-in page in your browser" className={btn.primary}>
+          {busy ? 'Waiting for sign-in…' : 'Sign in'}
+        </button>
+      )}
+      {remote && status === 'connected' && (
+        <button disabled={busy} onClick={() => act('mcp.auth.remove')} className={btn.ghost}>
+          Sign out
+        </button>
+      )}
+      {status === 'failed' && (
+        <button disabled={busy} onClick={() => act('mcp.connect')} className={btn.ghost}>
+          Reconnect
+        </button>
+      )}
+      {error && <span className="max-w-48 truncate text-xs text-red-500" title={error}>{error}</span>}
+    </>
+  )
+}
+
+function McpServers(): React.JSX.Element {
+  const { settings, inventory, updateOpencode, refreshInventory } = useSettings()
+  const [resources, setResources] = useState<McpResource[]>([])
+  useEffect(() => {
+    window.api
+      .chatsDirectory()
+      .then((directory) => window.api.oc<Record<string, McpResource>>('experimental.resource.list', { directory }))
+      .then((r) => setResources(Object.values(r ?? {})))
+      .catch(() => setResources([]))
+  }, [inventory])
   const servers = obj(settings.opencode, 'mcp') as Record<string, McpServer>
   // undefined = closed, '' = adding a new server, otherwise the name being edited.
   const [editing, setEditing] = useState<string>()
@@ -123,7 +215,24 @@ export function McpSection(): React.JSX.Element {
                   </p>
                   <p className="truncate font-mono text-xs text-neutral-500">{s.type === 'local' ? joinCommand(s.command ?? []) : s.url}</p>
                   {inventory?.mcp[name]?.error && <p className="selectable truncate text-xs text-red-500">{inventory.mcp[name].error}</p>}
+                  {resources.filter((r) => r.client === name).length > 0 && (
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-xs text-neutral-500">
+                        {resources.filter((r) => r.client === name).length} resources (use with @ in chat)
+                      </summary>
+                      <ul className="mt-1 space-y-0.5">
+                        {resources
+                          .filter((r) => r.client === name)
+                          .map((r) => (
+                            <li key={r.uri} className="truncate text-xs" title={r.uri}>
+                              <span className="font-mono">{r.name}</span> {r.description && <span className="text-neutral-500">· {r.description}</span>}
+                            </li>
+                          ))}
+                      </ul>
+                    </details>
+                  )}
                 </div>
+                <McpActions name={name} status={inventory?.mcp[name]?.status} remote={s.type === 'remote'} onDone={refreshInventory} />
                 <button onClick={() => open(name)} className={btn.ghost}>
                   Edit
                 </button>
@@ -220,9 +329,26 @@ export function McpSection(): React.JSX.Element {
 // ---------------------------------------------------------------- Plugins & hooks
 
 export function PluginsSection(): React.JSX.Element {
-  const { settings, updateOpencode } = useSettings()
+  const { settings, updateOpencode, save } = useSettings()
   return (
     <div className="space-y-10">
+      <Section
+        title="Goal mode"
+        description={
+          <>
+            Give the agent a goal with <code className="font-mono">/goal &lt;objective&gt;</code> and it keeps working across turns until the goal is met,
+            blocked or paused (<code className="font-mono">/pause_goal</code>, <code className="font-mono">/resume_goal</code>). Provided by the{' '}
+            <a href="https://github.com/prevalentWare/opencode-goal-plugin" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">
+              opencode-goal-plugin
+            </a>{' '}
+            (opencode doesn’t ship goal mode itself). Installed from npm on first start.
+          </>
+        }
+        actions={<Toggle checked={settings.goalMode} onChange={(goalMode) => save({ goalMode })} />}
+      >
+        <span />
+      </Section>
+
       <Section
         title="Plugins & hooks"
         description={

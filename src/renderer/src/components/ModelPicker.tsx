@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatBytes, supportsTools, useInstalledModels } from '../models'
-import { CheckIcon, ChevronDownIcon, SettingsIcon } from './icons'
+import { BrainIcon, CheckIcon, ChevronDownIcon, SettingsIcon } from './icons'
 
 /** Composer dropdown for switching the active model. Applies to the next message. */
 export function ModelPicker({ model, onOpenSettings }: { model: string; onOpenSettings: () => void }): React.JSX.Element {
@@ -13,12 +13,15 @@ export function ModelPicker({ model, onOpenSettings }: { model: string; onOpenSe
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0 shrink">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
+        title={`Model: ${model}`}
+        className="flex min-w-0 items-center gap-1 rounded-md px-2 py-1 text-xs text-neutral-500 hover:bg-neutral-200 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
       >
-        {model} <ChevronDownIcon className="size-3" />
+        <BrainIcon className="size-3.5 shrink-0" />
+        <span className="hidden min-w-0 truncate font-mono whitespace-nowrap @2xl:inline">{model}</span>
+        <ChevronDownIcon className="size-3 shrink-0" />
       </button>
       {open && (
         <>

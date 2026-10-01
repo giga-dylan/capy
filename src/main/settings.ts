@@ -10,6 +10,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   contextLength: 32_768,
   maxOutputTokens: 8192,
   reasoningEffort: {},
+  accessMode: 'ask',
+  browser: { enabled: true, headless: true },
+  goalMode: true,
   // Off so Capy only uses what's configured in Capy (and keeps prompts small for local models).
   claudeSkills: false,
   claudeRules: false,
@@ -31,7 +34,7 @@ export function loadSettings(): AppSettings {
     const overrides = opencodeOverrides ? (JSON.parse(opencodeOverrides) as OpencodeConfig) : {}
     opencode = { ...overrides, permission: { ...permissions, ...(overrides.permission as object) } }
   }
-  return { ...DEFAULT_SETTINGS, ...rest, opencode }
+  return { ...DEFAULT_SETTINGS, ...rest, browser: { ...DEFAULT_SETTINGS.browser, ...rest.browser }, opencode }
 }
 
 export function saveSettings(settings: AppSettings): void {

@@ -74,8 +74,13 @@ the folder button in the chat box when you want the agent to work on code.
 | Project | Folder button in the chat box | No folder, a recent project, or **Add folder…** |
 | Model | Model picker in the chat box | Any installed model; switching is instant |
 | Thinking | Thinking picker in the chat box | Only the levels the selected model supports |
-| Agent | Agent picker in the chat box | Build, Plan, or your own primary agents |
-| Commands | Type `/` | Built-in, your own and skill commands, with Tab completion |
+| Mode | `/plan`, `/build` | Switch the chat between opencode's agents (and your own primary agents) |
+| Goal | `/goal <objective>` | The agent keeps going across turns until the goal is met (`/pause_goal`, `/resume_goal`) |
+| Side chat | **Side chat** button | Ask about the current chat in a panel that never adds to it |
+| Commands | Type `/` | Built-in, your own and skill commands, with Tab completion; `/compact` summarizes the chat |
+| Files | Type `@`, the paperclip, or paste/drop | Mention project files or MCP resources; attach images for vision models |
+| Shell | Start a message with `!` | Run a command directly in the chat's folder (`!git status`) |
+| Access | Access picker in the chat box | **Ask first**, **Auto-approve** (work inside the project runs freely) or **Full access** (never asks) |
 | Trust | Approval cards in the chat | Allow once, always allow, or deny each edit and command |
 
 **Requirements:** an Apple Silicon Mac with **32 GB of memory or more** for the 27–30B
@@ -92,11 +97,32 @@ opencode's config from your settings and installed models, and forwards live eve
 
 | Component | Responsibility |
 | --- | --- |
-| Capy window | Chats, projects, approvals, pickers for model, agent and thinking, settings |
+| Capy window | Chats, side chat, projects, approvals, pickers for model, thinking and access, settings |
 | Electron main process | Service lifecycle, config generation, model downloads/imports, IPC |
 | opencode (bundled) | Agent loop, tools, permissions, agents, commands, skills, MCP, plugins |
 | Ollama (bundled) | Runs models on MLX; OpenAI-compatible API with tool calls and `reasoning_effort` |
 | Private app data | `settings.json`, chats, rules, agents, skills, plugins, custom tools |
+
+## Working with the agent
+
+Everything here is a view over opencode's own API, so it behaves exactly like opencode does.
+
+| Feature | Where | opencode API |
+| --- | --- | --- |
+| Markdown replies | Chat | Code blocks are highlighted and have a copy button |
+| Message times | Under each message | When it was sent; replies also show how long they took |
+| To-do list | Above the chat box while the agent works | `todo.updated`, `session.todo` |
+| Undo / redo | Hover a message → undo; **Redo** in the banner | `session.revert`, `session.unrevert` (file snapshots) |
+| Context meter | Ring in the chat box; click to compact | message token counts, `session.summarize` |
+| Questions | Card in the chat when the agent asks you something | `question.asked`, `question.reply` |
+| Side chat | **Side chat** button or `/side` | `session.fork` |
+| Changes | **Changes** panel: per request, plus uncommitted git changes | `session.diff`, `vcs.diff` |
+| Subagents | **Subagents** panel, or **Open subagent** on a task | `session.children` |
+| Files and search | **Files** panel: tree, text/file-name/symbol search, “@ Add to chat” | `file.*`, `find.*` |
+| Terminal | **Terminal** panel in the chat's folder | `pty.*` |
+| Git | Branch and change count in the chat header | `vcs.get`, `vcs.status` |
+| Worktrees | Folder picker → **New worktree**; listed under the project | `worktree.*` |
+| Rename chats | Pencil (or double-click) in the sidebar | `session.update` |
 
 ## Models and thinking
 
@@ -138,13 +164,13 @@ what's configured.
 | Tab | What it covers |
 | --- | --- |
 | Models & general | Install, import, delete and switch models; title model; model folder; context and output limits |
-| Permissions | All opencode permissions with ask / allow / deny and per-pattern rules (e.g. `git *` → allow) |
+| Permissions | Access mode (Ask first / Auto-approve / Full access), plus every opencode permission with ask / allow / deny and per-pattern rules |
 | Rules | Global `AGENTS.md`, extra instruction files or URLs, optional `CLAUDE.md` loading |
 | Agents | Built-in and custom agents, default agent, per-agent model/thinking/temperature/steps/prompt/permissions |
 | Commands | Every command, plus your own `commands/*.md` (run as `/name args`) |
 | Skills | Loaded skills by source, your own `SKILL.md` skills, extra folders and URLs |
-| MCP servers | Local or remote servers with env/headers, timeout, OAuth and live status |
-| Plugins & hooks | Plugin files with a hooks template (`tool.execute.before`, `session.idle`, …) and npm plugins |
+| MCP servers | Built-in browser (on/off, show window), plus local or remote servers with env/headers, timeout, OAuth sign-in, resources and live status |
+| Plugins & hooks | Goal mode toggle, plugin files with a hooks template (`tool.execute.before`, `session.idle`, …) and npm plugins |
 | Tools | Turn any tool off; write your own tools in TypeScript |
 | Formatters & LSP | Turn formatters and language servers on, per tool, plus custom ones |
 | Advanced | Compaction, tool output and image limits, shell, log level, watcher, references, experimental flags, raw JSON |
@@ -161,7 +187,16 @@ in about a second; switching model, thinking or agent doesn't.
 - **Memory decides the model.** 27–30B models need about 32 GB; the first load of a model
   from a slow external drive can take ~40 s.
 - **Approvals are on by default.** File edits, shell commands, web fetches and access
-  outside the chat's folder all ask first. You can relax any of them per pattern.
+  outside the chat's folder all ask first. Relax them per pattern, or switch the access
+  mode: **Auto-approve** lets work inside the project run freely, and **Full access** never
+  asks. A switch applies instantly, even to a task that's already running.
+- **Browser use** runs Microsoft's Playwright MCP (bundled) in Google Chrome with a separate
+  Chrome profile; Chrome must be installed. It's an ordinary MCP server in opencode's config.
+- **Goal mode isn't in opencode itself.** Capy enables the
+  [opencode-goal-plugin](https://github.com/prevalentWare/opencode-goal-plugin) through
+  opencode's plugin system (toggle in Plugins & hooks); it installs from npm on first start.
+- **Side chat** forks the chat with opencode's own `session.fork` and runs the read-only plan
+  agent. opencode 2.0 adds a native `/btw`; Capy will switch to it when 2.0 ships.
 - **Internet only when you ask.** Model downloads, web fetch/search tools you allow, and
   MCP servers you add are the only network use. Chat sharing and auto-update are off.
 - **Claude Code compatibility is off.** opencode can load `~/.claude/skills` and

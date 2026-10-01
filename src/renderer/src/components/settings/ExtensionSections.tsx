@@ -21,7 +21,7 @@ export function AgentsSection(): React.JSX.Element {
     <div className="space-y-10">
       <Section
         title="Agents"
-        description="Primary agents can be picked in the chat box. Subagents are called by other agents (or with @name in a message) for focused jobs."
+        description="Primary agents are chat modes: switch with /name in the chat box (e.g. /plan, /build). Subagents are called by other agents (or with @name in a message) for focused jobs."
         actions={
           <label className="flex items-center gap-2 text-xs text-neutral-500">
             Default

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { PermissionLevel, SaveResult } from '@shared/types'
+import type { AccessMode, PermissionLevel, SaveResult } from '@shared/types'
+import { ACCESS_MODES } from '../AccessPicker'
 import { PlusIcon, XIcon } from '../icons'
 import { obj, prune, useSettings } from './context'
 import { btn, inputCls, LevelSelect, list, SaveMessage, Section } from './ui'
@@ -42,7 +43,42 @@ function fromEntry({ level, rules }: Entry): unknown {
   return { ...Object.fromEntries(valid), ...(level && { '*': level }) }
 }
 
+/** The chat box's access mode, also selectable here. Auto/Full override the rules below. */
+function AccessModeSection(): React.JSX.Element {
+  const { settings, refreshInventory } = useSettings()
+  const [mode, setMode] = useState<AccessMode>(settings.accessMode)
+  return (
+    <Section title="Access mode" description="Also in the chat box. Auto-approve and Full access override the rules below for the chats they apply to.">
+      <div className="grid grid-cols-3 gap-2">
+        {ACCESS_MODES.map((m) => (
+          <button
+            key={m.mode}
+            onClick={async () => {
+              setMode(m.mode)
+              await window.api.setAccessMode(m.mode)
+              refreshInventory()
+            }}
+            className={`rounded-lg border p-3 text-left ${mode === m.mode ? 'border-blue-500 bg-blue-500/10' : 'border-neutral-200 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900'}`}
+          >
+            <p className={`text-sm font-medium ${m.mode === 'full' ? 'text-amber-500' : ''}`}>{m.label}</p>
+            <p className="mt-1 text-xs text-neutral-500">{m.description}</p>
+          </button>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
 export function PermissionsSection(): React.JSX.Element {
+  return (
+    <div className="space-y-10">
+      <AccessModeSection />
+      <PermissionRules />
+    </div>
+  )
+}
+
+function PermissionRules(): React.JSX.Element {
   const { settings, updateOpencode } = useSettings()
   const saved = obj(settings.opencode, 'permission')
   const [draft, setDraft] = useState<Record<string, Entry>>(() =>
@@ -73,10 +109,10 @@ export function PermissionsSection(): React.JSX.Element {
 
   return (
     <Section
-      title="Permissions"
+      title="Permission rules"
       description={
         <>
-          What the agent may do without asking. <b>Ask</b> shows an approval card in the chat. <b>Default</b> uses opencode’s default. Rules match in
+          What the agent may do without asking in <b>Ask first</b> mode. <b>Ask</b> shows an approval card in the chat. <b>Default</b> uses opencode’s default. Rules match in
           order; the most specific wins.
         </>
       }

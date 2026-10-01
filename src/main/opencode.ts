@@ -2,7 +2,8 @@ import type { ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
 // v2 client: matches the events the 1.18 server actually emits (permission.asked, message.part.delta, ...).
-import { createOpencodeClient, type Config, type OpencodeClient } from '@opencode-ai/sdk/v2'
+import { app } from 'electron'
+import { createOpencodeClient, type Config, type McpLocalConfig, type OpencodeClient } from '@opencode-ai/sdk/v2'
 import type { AgentEvent, AppSettings, InstalledModel } from '@shared/types'
 import { binDir } from './config'
 import { opencodeHome } from './extensions'
@@ -38,6 +39,8 @@ export function buildConfig(settings: AppSettings, ollamaBaseUrl: string, models
               tool_call: m.capabilities.includes('tools'),
               reasoning: m.capabilities.includes('thinking'),
               attachment: m.capabilities.includes('vision'),
+              // opencode only sends images to models whose input modalities include them.
+              ...(m.capabilities.includes('vision') && { modalities: { input: ['text', 'image'], output: ['text'] } }),
               limit: { context: settings.contextLength, output: settings.maxOutputTokens },
               variants: effortVariants(m)
             }
@@ -46,7 +49,42 @@ export function buildConfig(settings: AppSettings, ollamaBaseUrl: string, models
       }
     }
   }
-  return deepMerge(base, settings.opencode) as Config
+  const config = deepMerge(base, settings.opencode) as Config
+  // Built-in extras are plain opencode config: an MCP server and an npm plugin. They're added
+  // after the merge so the user's own `mcp` / `plugin` entries don't replace them.
+  if (settings.browser.enabled && !config.mcp?.browser) config.mcp = { ...config.mcp, browser: browserMcp(settings) }
+  if (settings.goalMode) {
+    const plugins = config.plugin ?? []
+    if (!plugins.some((p) => (Array.isArray(p) ? p[0] : p).startsWith(GOAL_PLUGIN_NAME))) config.plugin = [...plugins, GOAL_PLUGIN]
+  }
+  return config
+}
+
+/** Goal mode (Codex-style /goal) isn't in opencode itself; this plugin adds it via opencode's plugin system. */
+const GOAL_PLUGIN_NAME = '@prevalentware/opencode-goal-plugin'
+const GOAL_PLUGIN = `${GOAL_PLUGIN_NAME}@0.1.53`
+
+export const CHROME_PATH = '/Applications/Google Chrome.app'
+
+/**
+ * Browser use via Microsoft's Playwright MCP (bundled), run with Electron's built-in Node so users
+ * don't need Node.js. It drives the user's Google Chrome with a profile private to Capy.
+ */
+function browserMcp(settings: AppSettings): McpLocalConfig {
+  const root = app.isPackaged ? app.getAppPath().replace('app.asar', 'app.asar.unpacked') : app.getAppPath()
+  const data = app.getPath('userData')
+  return {
+    type: 'local',
+    command: [
+      process.execPath,
+      join(root, 'node_modules', '@playwright', 'mcp', 'cli.js'),
+      '--browser=chrome',
+      `--user-data-dir=${join(data, 'browser', 'profile')}`,
+      `--output-dir=${join(data, 'browser', 'output')}`,
+      ...(settings.browser.headless ? ['--headless'] : [])
+    ],
+    environment: { ELECTRON_RUN_AS_NODE: '1' }
+  }
 }
 
 /**
@@ -112,6 +150,13 @@ export class OpencodeRuntime {
     this.abortEvents = new AbortController()
     const { stream } = await this.client.global.event({ signal: this.abortEvents.signal })
     for await (const { directory, payload } of stream) onEvent(directory, payload)
+  }
+
+  /** Opens an opencode PTY's WebSocket (with the password header, which browsers can't send). */
+  connectPty(directory: string, ptyID: string): WebSocket {
+    const url = `${this.baseUrl.replace('http', 'ws')}/pty/${ptyID}/connect?directory=${encodeURIComponent(directory)}`
+    // Node's WebSocket (undici) accepts headers; the browser API does not.
+    return new WebSocket(url, { headers: { Authorization: this.authHeader } } as unknown as string[])
   }
 
   async stop(): Promise<void> {
