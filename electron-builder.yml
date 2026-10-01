@@ -1,0 +1,37 @@
+appId: app.capy.desktop
+productName: Capy
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - '**/*.node'
+# Bundled runtimes (ollama + opencode) live outside the asar so they can be executed.
+extraResources:
+  - from: resources/bin
+    to: bin
+    filter: ['**/*', '!.versions.json']
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]
+  category: public.app-category.developer-tools
+  minimumSystemVersion: '14.0'
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # Every bundled binary/dylib must be signed for notarization.
+  binaries:
+    - Contents/Resources/bin/opencode
+    - Contents/Resources/bin/ollama/ollama
+    - Contents/Resources/bin/ollama/llama-server
+  notarize: true
+dmg:
+  artifactName: ${productName}-${version}-arm64.dmg
+publish:
+  provider: github

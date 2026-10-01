@@ -1,0 +1,271 @@
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { readdirSync, statSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { IPC, type AppSettings, type InstalledModel, type ModelProgress, type PermissionResponse, type RuntimeStatus, type SaveResult } from '@shared/types'
+import { OllamaRuntime } from './ollama'
+import { buildConfig, OpencodeRuntime, PROVIDER_ID } from './opencode'
+import { chatsDirectory, ProjectStore } from './projects'
+import { loadSettings, saveSettings, validateOverrides } from './settings'
+
+const ollama = new OllamaRuntime()
+const opencode = new OpencodeRuntime()
+const projects = new ProjectStore()
+let win: BrowserWindow | undefined
+let settings: AppSettings
+let models: InstalledModel[] = []
+
+const status: RuntimeStatus = { ollama: 'stopped', opencode: 'stopped', model: '', hasModels: false }
+
+function setStatus(patch: Partial<RuntimeStatus>): void {
+  Object.assign(status, patch)
+  win?.webContents.send(IPC.status, status)
+}
+
+function sendProgress(p: ModelProgress): void {
+  win?.webContents.send(IPC.modelProgress, p)
+}
+
+/** Restarts/reconfigurations run one at a time so services never overlap. */
+let queue: Promise<unknown> = Promise.resolve()
+function serially<T>(fn: () => Promise<T>): Promise<T> {
+  const next = queue.then(fn)
+  queue = next.catch(() => undefined)
+  return next
+}
+
+/** Reloads the installed-model list and keeps the active model valid. */
+async function refreshModels(): Promise<void> {
+  models = await ollama.listModels()
+  if (models.length && !models.some((m) => m.name === settings.model)) {
+    const fallback = models.find((m) => m.capabilities.includes('tools')) ?? models[0]
+    settings = { ...settings, model: fallback.name }
+    saveSettings(settings)
+  }
+  setStatus({ model: settings.model, hasModels: models.length > 0 })
+}
+
+async function startOllama(restart = false): Promise<void> {
+  setStatus({ ollama: 'starting', error: undefined })
+  const options = { modelsDir: settings.modelsDir, contextLength: settings.contextLength }
+  await (restart ? ollama.restart(options) : ollama.start(options))
+  setStatus({ ollama: 'ready' })
+  await refreshModels()
+}
+
+async function startOpencode(restart = false): Promise<void> {
+  setStatus({ opencode: 'starting', error: undefined })
+  if (restart) await opencode.stop()
+  await opencode.start(buildConfig(settings, ollama.baseUrl, models))
+  setStatus({ opencode: 'ready' })
+  opencode
+    .streamEvents((directory, event) => win?.webContents.send(IPC.agentEvent, directory, event))
+    .catch((err) => (err as Error).name !== 'AbortError' && console.error('[opencode] event stream ended', err))
+}
+
+function reportFailure(err: unknown): void {
+  console.error(err)
+  setStatus({
+    error: String(err),
+    ollama: status.ollama === 'ready' ? 'ready' : 'error',
+    opencode: status.opencode === 'ready' ? 'ready' : 'error'
+  })
+}
+
+function bootRuntimes(): Promise<void> {
+  return serially(async () => {
+    await startOllama()
+    await startOpencode()
+  }).catch(reportFailure)
+}
+
+/** opencode needs a restart to see added/removed models. */
+const afterModelsChanged = (): Promise<void> =>
+  serially(async () => {
+    await refreshModels()
+    await startOpencode(true)
+  })
+
+async function applySettings(patch: Partial<AppSettings>): Promise<SaveResult> {
+  const next: AppSettings = { ...settings, ...patch, permissions: { ...settings.permissions, ...patch.permissions } }
+  const overridesError = validateOverrides(next.opencodeOverrides)
+  if (overridesError) return { ok: false, error: overridesError }
+  if (!(next.contextLength >= 2048) || !(next.maxOutputTokens >= 256)) return { ok: false, error: 'Context must be ≥ 2048 and output ≥ 256 tokens.' }
+
+  const changed = (keys: (keyof AppSettings)[]): boolean => keys.some((k) => JSON.stringify(next[k]) !== JSON.stringify(settings[k]))
+  const restartOllama = changed(['modelsDir', 'contextLength'])
+  // The active model is sent with each prompt, so switching it needs no restart.
+  const restartOpencode = restartOllama || changed(['maxOutputTokens', 'permissions', 'opencodeOverrides'])
+
+  settings = next
+  saveSettings(settings)
+  setStatus({ model: settings.model })
+  try {
+    await serially(async () => {
+      if (restartOllama) await startOllama(true)
+      if (restartOpencode) await startOpencode(true)
+    })
+  } catch (err) {
+    reportFailure(err)
+    return { ok: false, error: `Saved, but a service failed to restart: ${String(err)}` }
+  }
+  return { ok: true, settings }
+}
+
+/** Ollama model names: lowercase letters, digits, and . _ - (plus one optional :tag). */
+function modelNameFrom(path: string): string {
+  const stem = basename(path).replace(/\.gguf$/i, '')
+  return stem.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'imported-model'
+}
+
+/** A picked folder may be an MLX/safetensors model, or a folder holding a single .gguf file. */
+function importSource(path: string): string {
+  if (!statSync(path).isDirectory()) return path
+  const ggufs = readdirSync(path).filter((f) => f.toLowerCase().endsWith('.gguf'))
+  return ggufs.length === 1 ? join(path, ggufs[0]) : path
+}
+
+function registerIpc(): void {
+  ipcMain.handle(IPC.getStatus, () => status)
+  ipcMain.handle(IPC.getSettings, () => settings)
+  ipcMain.handle(IPC.saveSettings, (_e, patch: Partial<AppSettings>) => applySettings(patch))
+  ipcMain.handle(IPC.getEffectiveConfig, () => buildConfig(settings, ollama.baseUrl, models))
+  ipcMain.handle(IPC.chooseModelsDir, async () => {
+    const res = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'], message: 'Choose where Ollama stores models' })
+    return res.canceled ? null : res.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.listModels, () => models)
+
+  ipcMain.handle(IPC.pullModel, async (_e, name: string) => {
+    try {
+      await ollama.pull(name, sendProgress)
+      await afterModelsChanged()
+      sendProgress({ model: name, status: 'Installed', done: true })
+    } catch (err) {
+      sendProgress({ model: name, status: 'Failed', done: true, error: String(err) })
+      throw err
+    }
+  })
+
+  ipcMain.handle(IPC.importModel, async () => {
+    const res = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory', 'openFile'],
+      filters: [{ name: 'Model', extensions: ['gguf'] }],
+      message: 'Choose an MLX/safetensors model folder or a .gguf file'
+    })
+    if (res.canceled) return null
+    const source = importSource(res.filePaths[0])
+    const name = modelNameFrom(res.filePaths[0])
+    try {
+      await ollama.import(source, name, sendProgress)
+      await afterModelsChanged()
+      sendProgress({ model: name, status: 'Imported', done: true })
+      return name
+    } catch (err) {
+      sendProgress({ model: name, status: 'Failed', done: true, error: String(err) })
+      throw err
+    }
+  })
+
+  ipcMain.handle(IPC.deleteModel, async (_e, name: string) => {
+    await ollama.delete(name)
+    await afterModelsChanged()
+  })
+
+  ipcMain.handle(IPC.chatsDirectory, () => chatsDirectory())
+  ipcMain.handle(IPC.listProjects, () => projects.list())
+  ipcMain.handle(IPC.removeProject, (_e, directory: string) => projects.remove(directory))
+  ipcMain.handle(IPC.addProject, async () => {
+    const res = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] })
+    if (res.canceled) return null
+    projects.add(res.filePaths[0])
+    return res.filePaths[0]
+  })
+
+  // Top-level chats only (no subagent children). Non-git folders share opencode's
+  // "global" project, so filter to sessions that actually live in this folder.
+  ipcMain.handle(IPC.listSessions, async (_e, directory: string) => {
+    const { data } = await opencode.client.session.list({ directory, roots: true })
+    return (data ?? []).filter((s) => s.directory === directory).sort((a, b) => b.time.updated - a.time.updated)
+  })
+
+  ipcMain.handle(IPC.getMessages, async (_e, directory: string, sessionID: string) => {
+    const { data } = await opencode.client.session.messages({ directory, sessionID })
+    return data
+  })
+
+  ipcMain.handle(IPC.createSession, async (_e, directory: string) => {
+    const { data } = await opencode.client.session.create({ directory })
+    return data
+  })
+
+  ipcMain.handle(IPC.deleteSession, async (_e, directory: string, sessionID: string) => {
+    await opencode.client.session.delete({ directory, sessionID })
+  })
+
+  // promptAsync returns immediately; progress arrives on the event stream.
+  ipcMain.handle(IPC.prompt, async (_e, directory: string, sessionID: string, text: string) => {
+    await opencode.client.session.promptAsync({
+      directory,
+      sessionID,
+      model: { providerID: PROVIDER_ID, modelID: settings.model },
+      parts: [{ type: 'text', text }]
+    })
+  })
+
+  ipcMain.handle(IPC.abort, async (_e, directory: string, sessionID: string) => {
+    await opencode.client.session.abort({ directory, sessionID })
+  })
+
+  ipcMain.handle(IPC.respondPermission, async (_e, directory: string, requestID: string, reply: PermissionResponse) => {
+    await opencode.client.permission.reply({ directory, requestID, reply })
+  })
+}
+
+function createWindow(): void {
+  win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 760,
+    minHeight: 500,
+    titleBarStyle: 'hiddenInset',
+    backgroundColor: '#0b0b0c',
+    webPreferences: {
+      preload: join(import.meta.dirname, '../preload/index.cjs'),
+      sandbox: true,
+      contextIsolation: true
+    }
+  })
+  // Surface renderer problems in the terminal; a blank window is otherwise silent.
+  win.webContents.on('console-message', ({ level, message, sourceId, lineNumber }) => {
+    if (level === 'warning' || level === 'error') console.log(`[renderer:${level}] ${message} (${sourceId}:${lineNumber})`)
+  })
+  win.webContents.on('did-fail-load', (_e, code, desc, url) => console.error(`[renderer] failed to load ${url}: ${desc} (${code})`))
+  win.webContents.on('render-process-gone', (_e, details) => console.error('[renderer] process gone', details))
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
+  else win.loadFile(join(import.meta.dirname, '../renderer/index.html'))
+}
+
+// Dev aid: CAPY_DEBUG_PORT=9222 npm run dev exposes Chrome DevTools Protocol for inspecting the renderer.
+if (process.env.CAPY_DEBUG_PORT) app.commandLine.appendSwitch('remote-debugging-port', process.env.CAPY_DEBUG_PORT)
+
+app.whenReady().then(() => {
+  // Packaged builds get the icon from the bundle; in dev, show it in the Dock too.
+  if (!app.isPackaged) app.dock?.setIcon(join(app.getAppPath(), 'build', 'icon.png'))
+  settings = loadSettings()
+  registerIpc()
+  createWindow()
+  bootRuntimes()
+  app.on('activate', () => BrowserWindow.getAllWindows().length === 0 && createWindow())
+})
+
+app.on('window-all-closed', () => app.quit())
+
+app.on('before-quit', () => {
+  void opencode.stop()
+  ollama.stop()
+})

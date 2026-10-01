@@ -1,0 +1,41 @@
+{
+  "name": "capy",
+  "productName": "Capy",
+  "version": "0.1.0",
+  "description": "Desktop app for running coding agents on local LLMs (macOS / Apple Silicon)",
+  "private": true,
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "postinstall": "node scripts/fetch-binaries.mjs",
+    "fetch-binaries": "node scripts/fetch-binaries.mjs",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "dist": "npm run build && electron-builder --mac --arm64"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "1.18.34"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "opencode-darwin-arm64": "1.18.34",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6"
+  },
+  "binaries": {
+    "ollama": "0.35.0",
+    "opencode": "1.18.34"
+  }
+}

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="270 230 600 670">
+  <g stroke="#2B1B2E" stroke-width="20" stroke-linejoin="round" stroke-linecap="round">
+    <!-- ears -->
+    <ellipse cx="455" cy="300" rx="52" ry="58" fill="#C98A55"/>
+    <ellipse cx="455" cy="308" rx="22" ry="28" fill="#8A5A3C" stroke="none"/>
+    <ellipse cx="690" cy="305" rx="56" ry="60" fill="#C98A55"/>
+    <ellipse cx="694" cy="314" rx="26" ry="30" fill="#8A5A3C" stroke="none"/>
+    <!-- head + body -->
+    <path fill="#C98A55" d="M 300 500
+      C 290 360, 410 280, 560 282
+      C 700 284, 790 360, 800 470
+      C 840 560, 850 690, 820 770
+      C 795 845, 720 870, 610 870
+      L 430 870
+      C 345 870, 300 830, 312 760
+      C 322 700, 352 665, 372 640
+      C 318 620, 296 565, 300 500 Z"/>
+    <!-- belly -->
+    <path fill="#DDA572" stroke="none" d="M 380 650 C 430 620, 560 640, 600 720 C 630 790, 600 850, 520 858 L 430 858 C 360 858, 326 820, 332 765 C 340 705, 360 670, 380 650 Z"/>
+    <!-- muzzle -->
+    <path fill="#8A5A3C" stroke="none" d="M 305 500 C 300 420, 360 385, 430 392 C 500 400, 528 460, 515 530 C 505 590, 450 620, 390 612 C 335 605, 308 560, 305 500 Z"/>
+    <!-- outline re-stroke over muzzle edge -->
+    <path fill="none" d="M 300 500 C 296 565, 318 620, 372 640"/>
+    <!-- nose -->
+    <path fill="#4A2C22" stroke="none" d="M 326 448 C 324 424, 420 418, 428 442 C 434 466, 400 492, 378 493 C 356 494, 328 472, 326 448 Z"/>
+    <ellipse cx="362" cy="440" rx="16" ry="7" fill="#7A4E3A" stroke="none" transform="rotate(-8 362 440)"/>
+    <!-- mouth -->
+    <path fill="none" stroke-width="11" d="M 378 494 L 378 524 M 350 534 C 364 548, 392 548, 406 534"/>
+    <!-- eye -->
+    <circle cx="590" cy="420" r="36" fill="#2B1B2E" stroke="none"/>
+    <circle cx="578" cy="406" r="12" fill="#fff" stroke="none"/>
+    <circle cx="602" cy="434" r="6" fill="#fff" stroke="none"/>
+    <!-- cheek -->
+    <ellipse cx="610" cy="505" rx="34" ry="20" fill="#F2A7A0" opacity="0.7" stroke="none"/>
+    <!-- head shine -->
+    <ellipse cx="560" cy="330" rx="38" ry="18" fill="#E8B88A" stroke="none" transform="rotate(-10 560 330)"/>
+    <!-- arm -->
+    <path fill="none" stroke-width="16" d="M 470 690 C 520 700, 560 690, 600 660"/>
+    <!-- hind leg -->
+    <path fill="none" stroke-width="16" d="M 650 860 C 640 790, 690 740, 760 735"/>
+    <!-- feet -->
+    <path fill="#8A5A3C" d="M 395 870 C 385 820, 415 790, 450 800 C 480 810, 490 850, 480 875 Z"/>
+    <path fill="#8A5A3C" d="M 520 875 C 512 830, 540 805, 572 812 C 600 820, 608 855, 600 878 Z"/>
+    <!-- water line -->
+  </g>
+</svg>
