@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+<title id="title">Capy architecture</title>
+<desc id="desc">The Capy window talks to the Electron main process, which supervises two local services: the opencode agent engine and the Ollama model server. opencode calls Ollama through its OpenAI-compatible API. The agent works on your project folders with your approval; settings, chats and extensions stay in Capy's private data folder.</desc>
+<defs>
+  <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#64748b" stroke-width="1.5"/></marker>
+  <marker id="amber" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="none" stroke="#f0b37e" stroke-width="1.5"/></marker>
+</defs>
+<rect width="1200" height="760" rx="24" fill="#0f172a"/>
+<g font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif">
+<text x="48" y="51" fill="#f0b37e" font-size="13" font-weight="700" letter-spacing="2">CAPY</text>
+<text x="48" y="88" fill="#f8fafc" font-size="29" font-weight="700">Everything runs on your Mac.</text>
+<text x="48" y="118" fill="#94a3b8" font-size="16">One desktop app supervises two local services. No cloud provider is ever configured.</text>
+
+<!-- dashed machine boundary -->
+<rect x="28" y="140" width="1144" height="560" rx="20" fill="none" stroke="#334155" stroke-width="1.5" stroke-dasharray="8 7"/>
+<text x="48" y="166" fill="#64748b" font-size="12" font-weight="700" letter-spacing="2">YOUR MAC</text>
+
+<!-- row 1 -->
+<rect x="48" y="184" width="330" height="112" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="68" y="216" fill="#f8fafc" font-size="18" font-weight="600">Capy window</text>
+<text x="68" y="242" fill="#cbd5e1" font-size="14">Chats · projects · approvals</text>
+<text x="68" y="265" fill="#cbd5e1" font-size="14">Model, agent and thinking pickers</text>
+<text x="68" y="285" fill="#94a3b8" font-size="12">React renderer, sandboxed</text>
+<path d="M378 240 H426" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="384" y="230" fill="#64748b" font-size="11">IPC</text>
+
+<rect x="434" y="184" width="718" height="112" rx="12" fill="#2a2333" stroke="#f0b37e"/>
+<text x="454" y="216" fill="#f8fafc" font-size="18" font-weight="600">Electron main process</text>
+<text x="454" y="242" fill="#cbd5e1" font-size="14">Starts both services on random localhost ports · restarts them when settings change</text>
+<text x="454" y="265" fill="#cbd5e1" font-size="14">Builds the opencode config from your settings + installed models · forwards live events</text>
+<text x="454" y="285" fill="#94a3b8" font-size="12">Model downloads and imports · settings.json · project list</text>
+
+<!-- row 2 -->
+<path d="M620 296 V340" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<path d="M980 296 V340" fill="none" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+<text x="630" y="324" fill="#64748b" font-size="11">spawn · HTTP + password</text>
+<text x="990" y="324" fill="#64748b" font-size="11">spawn · HTTP</text>
+
+<rect x="434" y="348" width="372" height="170" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="454" y="380" fill="#f8fafc" font-size="18" font-weight="600">opencode serve</text>
+<text x="454" y="404" fill="#94a3b8" font-size="12">Agent engine (bundled, pinned version)</text>
+<text x="454" y="430" fill="#cbd5e1" font-size="14">Sessions · tools · permissions</text>
+<text x="454" y="453" fill="#cbd5e1" font-size="14">Agents · commands · skills · rules</text>
+<text x="454" y="476" fill="#cbd5e1" font-size="14">MCP servers · plugins &amp; hooks</text>
+<text x="454" y="503" fill="#94a3b8" font-size="12">Per-launch password · private config folder</text>
+
+<path d="M806 432 H860" fill="none" stroke="#f0b37e" stroke-width="2" marker-end="url(#amber)"/>
+
+<rect x="868" y="348" width="284" height="170" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="888" y="380" fill="#f8fafc" font-size="18" font-weight="600">Ollama serve</text>
+<text x="888" y="404" fill="#94a3b8" font-size="12">Model server (bundled, MLX engine)</text>
+<text x="888" y="430" fill="#cbd5e1" font-size="14">/v1/chat/completions</text>
+<text x="888" y="453" fill="#cbd5e1" font-size="14">Tool calls · reasoning_effort</text>
+<text x="888" y="476" fill="#cbd5e1" font-size="14">Prompt cache · 32K+ context</text>
+<text x="888" y="503" fill="#94a3b8" font-size="12">Only provider opencode may use</text>
+
+<rect x="48" y="348" width="330" height="170" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="68" y="380" fill="#f8fafc" font-size="18" font-weight="600">Models</text>
+<text x="68" y="406" fill="#cbd5e1" font-size="14">Download from the Ollama library</text>
+<text x="68" y="429" fill="#cbd5e1" font-size="14">Import MLX folders or .gguf files</text>
+<text x="68" y="452" fill="#cbd5e1" font-size="14">~/.ollama/models or a folder you pick</text>
+<text x="68" y="503" fill="#94a3b8" font-size="12">Thinking levels read per model</text>
+
+<!-- row 3 -->
+<path d="M620 518 V562" fill="none" stroke="#f0b37e" stroke-width="2" marker-end="url(#amber)"/>
+<text x="630" y="546" fill="#f0b37e" font-size="11">reads · edits · runs commands (with approval)</text>
+
+<rect x="434" y="570" width="372" height="110" rx="12" fill="#2a2333" stroke="#f0b37e"/>
+<text x="454" y="602" fill="#f8fafc" font-size="18" font-weight="600">Your project folders</text>
+<text x="454" y="628" fill="#cbd5e1" font-size="14">Or a private workspace for no-folder chats</text>
+<text x="454" y="651" fill="#cbd5e1" font-size="14">Project AGENTS.md and .opencode/ apply</text>
+
+<rect x="868" y="570" width="284" height="110" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="888" y="602" fill="#f8fafc" font-size="18" font-weight="600">Private app data</text>
+<text x="888" y="628" fill="#cbd5e1" font-size="14">Settings · chats · rules · agents</text>
+<text x="888" y="651" fill="#cbd5e1" font-size="14">Skills · plugins · custom tools</text>
+<text x="888" y="672" fill="#94a3b8" font-size="12">~/Library/Application Support/Capy</text>
+
+<rect x="48" y="570" width="330" height="110" rx="12" fill="#1e293b" stroke="#334155"/>
+<text x="68" y="602" fill="#f8fafc" font-size="18" font-weight="600">Off by default</text>
+<text x="68" y="628" fill="#cbd5e1" font-size="14">Cloud providers · chat sharing</text>
+<text x="68" y="651" fill="#cbd5e1" font-size="14">Auto-update · Claude Code skills</text>
+
+<text x="48" y="730" fill="#64748b" font-size="13">Internet access happens only when you ask: model downloads, web fetch/search tools you allow, and MCP servers you add.</text>
+</g>
+</svg>

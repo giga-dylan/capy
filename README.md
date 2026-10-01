@@ -1,74 +1,210 @@
-# Capy
+<p align="center">
+  <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white" alt="macOS on Apple Silicon">
+  <img src="https://img.shields.io/badge/Models-100%25%20local-C98A55" alt="100% local models">
+  <img src="https://img.shields.io/badge/Agent-opencode-6366f1" alt="Agent: opencode">
+  <img src="https://img.shields.io/badge/Runtime-Ollama%20%2B%20MLX-5B8DB8" alt="Runtime: Ollama + MLX">
+  <img src="https://img.shields.io/badge/Status-Experimental-f4a7c3" alt="Experimental">
+</p>
 
-Desktop app for running coding agents on local LLMs. macOS / Apple Silicon only, 32 GB RAM minimum.
+<p align="center">
+  <img src="assets/hero.png" width="100%" alt="Capy: your favorite capybara, helping you out without ever leaving your machine. Ask, local model, agent, you approve, done — all on your Mac.">
+</p>
 
-- **Agent engine:** [opencode](https://opencode.ai) (bundled binary, driven over HTTP via `@opencode-ai/sdk`)
-- **Model server:** [Ollama](https://ollama.com) (bundled, MLX engine)
-- **Default model:** `qwen3.8:27b-mlx` (~18 GB)
+## What it is
+
+**Capy is a desktop app for coding agents that run entirely on your Mac.**
+Ask it to change code, explain a project or just chat. A capable agent reads your files,
+plans, edits and runs commands, and asks before it touches anything. The model, the agent
+and your data all stay on your machine.
+
+Under the hood Capy bundles two open-source engines and makes them feel like one app:
+
+- **[opencode](https://opencode.ai)** is the agent: sessions, tools, permissions, agents,
+  skills, MCP servers and plugins.
+- **[Ollama](https://ollama.com)** runs the model on Apple's **MLX** engine, the fastest
+  way to run local models on Apple Silicon.
+
+Capy starts and supervises both, wires them together, and surfaces every opencode setting
+in a real settings screen, so you never touch a terminal or a JSON file unless you want to.
+Nothing is sent to a cloud model provider; there isn't one configured.
+
+## See it in action
+
+<p align="center">
+  <a href="assets/demo.mp4"><img src="assets/demo.gif" width="100%" alt="Capy recording: a request to add a slugify helper with a test; the agent reads the project, asks before editing two files and running npm test, and reports that both tests pass."></a>
+</p>
+<p align="center"><strong><a href="assets/demo.mp4">Open the video with pause and scrub controls</a></strong><br>
+<sub>Real recording on an M5 Max running Qwen 3.8 27B (MLX, 4-bit) locally. Sped up 1.3×; waiting is trimmed.</sub></p>
+
+**The example:** in a small Node project, you ask for *“a slugify(text) helper in
+src/utils.js with a test, then run the tests.”* The agent explores the project, then asks
+for approval before each edit and before running `npm test`. It finishes with working code
+and two passing tests, in about 50 seconds, without a byte leaving the laptop.
+
+<p align="center">
+  <a href="#start">Start</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#models-and-thinking">Models &amp; thinking</a> ·
+  <a href="#settings">Settings</a> ·
+  <a href="#develop">Develop</a>
+</p>
+
+## Start
+
+Build and run it from source (signed releases are coming):
+
+```sh
+git clone https://github.com/giga-dylan/capy.git
+cd capy
+npm install      # also fetches the pinned Ollama + opencode builds
+npm run dev
+```
+
+On first launch Capy starts its local services and asks you to pick a model. Download one
+of the recommended models, any model from the Ollama library, or import one you already
+have on disk (for example an MLX folder from LM Studio). Then just type:
+
+> Help me understand how this project handles authentication.
+
+There is no setup wizard and no account. Chats work without a folder; pick a project from
+the folder button in the chat box when you want the agent to work on code.
+
+| Choice | Where | What you decide |
+| --- | --- | --- |
+| Project | Folder button in the chat box | No folder, a recent project, or **Add folder…** |
+| Model | Model picker in the chat box | Any installed model; switching is instant |
+| Thinking | Thinking picker in the chat box | Only the levels the selected model supports |
+| Agent | Agent picker in the chat box | Build, Plan, or your own primary agents |
+| Commands | Type `/` | Built-in, your own and skill commands, with Tab completion |
+| Trust | Approval cards in the chat | Allow once, always allow, or deny each edit and command |
+
+**Requirements:** an Apple Silicon Mac with **32 GB of memory or more** for the 27–30B
+models (smaller models need less) and macOS 14 or later.
+
+## Architecture
+
+![Capy architecture: the Capy window talks to the Electron main process over IPC. The main process spawns opencode (agent engine, password-protected) and Ollama (model server, MLX). opencode calls Ollama's OpenAI-compatible API and works on your project folders with approval. Settings, chats and extensions live in Capy's private app data.](assets/architecture.svg)
+
+The window never talks to a model directly. The Electron main process starts both services
+on random localhost ports, gives opencode a fresh password every launch, generates
+opencode's config from your settings and installed models, and forwards live events
+(streaming text, tool calls, approval requests) to the window.
+
+| Component | Responsibility |
+| --- | --- |
+| Capy window | Chats, projects, approvals, pickers for model, agent and thinking, settings |
+| Electron main process | Service lifecycle, config generation, model downloads/imports, IPC |
+| opencode (bundled) | Agent loop, tools, permissions, agents, commands, skills, MCP, plugins |
+| Ollama (bundled) | Runs models on MLX; OpenAI-compatible API with tool calls and `reasoning_effort` |
+| Private app data | `settings.json`, chats, rules, agents, skills, plugins, custom tools |
+
+## Models and thinking
+
+Pick from a curated list, any [Ollama library](https://ollama.com/library) tag, or import an
+MLX/safetensors folder or `.gguf` file. Models without tool support are flagged, because an
+agent needs tools to do real work. A separate, smaller model can handle chat titles and
+summaries.
+
+**Thinking (reasoning effort) follows the model.** Capy reads each model's supported levels
+from Ollama and offers only those. Ollama silently ignores levels a model doesn't support,
+so guessing would mean a picker that does nothing. These were tested on real models:
+
+| Model type | Example | Capy shows |
+| --- | --- | --- |
+| Named levels | Qwen 3.8 | Off · Low · Medium · Extra high |
+| On/off | Qwen 3 | Off · On |
+| Always thinks | DeepSeek-R1 | “Thinking: always on” (not adjustable) |
+| No thinking | most instruct models | nothing |
+
+<p align="center">
+  <img src="assets/screenshot-chat-thinking.png" width="80%" alt="The chat box with the Thinking menu open: Off, Low, Medium (model default) and Extra high.">
+</p>
+
+## Settings
+
+Everything opencode can do is surfaced in **Settings**, and each screen shows what's
+actually loaded right now (built-in agents, skills, MCP status, formatters), not just
+what's configured.
+
+<p align="center">
+  <img src="assets/screenshot-settings-models.png" width="49%" alt="Models settings: installed model with its size and thinking levels, recommended models, download any Ollama tag, import from disk.">
+  <img src="assets/screenshot-settings-permissions.png" width="49%" alt="Permissions settings: every opencode permission with ask, allow, deny and per-pattern rules.">
+</p>
+<p align="center">
+  <img src="assets/screenshot-settings-agents.png" width="49%" alt="Agents settings: built-in and custom agents with per-agent overrides.">
+  <img src="assets/screenshot-settings-skills.png" width="49%" alt="Skills settings: loaded skills by source, your own skills, and extra skill folders or URLs.">
+</p>
+
+| Tab | What it covers |
+| --- | --- |
+| Models & general | Install, import, delete and switch models; title model; model folder; context and output limits |
+| Permissions | All opencode permissions with ask / allow / deny and per-pattern rules (e.g. `git *` → allow) |
+| Rules | Global `AGENTS.md`, extra instruction files or URLs, optional `CLAUDE.md` loading |
+| Agents | Built-in and custom agents, default agent, per-agent model/thinking/temperature/steps/prompt/permissions |
+| Commands | Every command, plus your own `commands/*.md` (run as `/name args`) |
+| Skills | Loaded skills by source, your own `SKILL.md` skills, extra folders and URLs |
+| MCP servers | Local or remote servers with env/headers, timeout, OAuth and live status |
+| Plugins & hooks | Plugin files with a hooks template (`tool.execute.before`, `session.idle`, …) and npm plugins |
+| Tools | Turn any tool off; write your own tools in TypeScript |
+| Formatters & LSP | Turn formatters and language servers on, per tool, plus custom ones |
+| Advanced | Compaction, tool output and image limits, shell, log level, watcher, references, experimental flags, raw JSON |
+
+Every screen edits one JSON layer that is merged over the config Capy generates, so the
+raw editor in **Advanced** and the forms never disagree. Saving restarts the agent engine
+in about a second; switching model, thinking or agent doesn't.
+
+## Capabilities and limits
+
+- **Local models are smaller than frontier models.** Expect good results on focused tasks
+  and slower, less reliable ones on sprawling changes. Qwen 3.8 27B on an M5 Max generates
+  ~30 tokens/s and reads a 16K-token prompt at ~930 tokens/s.
+- **Memory decides the model.** 27–30B models need about 32 GB; the first load of a model
+  from a slow external drive can take ~40 s.
+- **Approvals are on by default.** File edits, shell commands, web fetches and access
+  outside the chat's folder all ask first. You can relax any of them per pattern.
+- **Internet only when you ask.** Model downloads, web fetch/search tools you allow, and
+  MCP servers you add are the only network use. Chat sharing and auto-update are off.
+- **Claude Code compatibility is off.** opencode can load `~/.claude/skills` and
+  `CLAUDE.md`; Capy disables that by default so it only uses what's configured in Capy.
+  Toggle it in Skills and Rules.
+- **macOS on Apple Silicon only** for now.
+
+## Private state and storage
+
+| What | Where |
+| --- | --- |
+| App settings and the opencode config layer | `~/Library/Application Support/Capy/settings.json` |
+| Rules, agents, commands, skills, plugins, tools | `~/Library/Application Support/Capy/opencode/config/opencode/` |
+| Chats | `~/Library/Application Support/Capy/opencode/data/` |
+| No-folder chat workspace | `~/Library/Application Support/Capy/chats/` |
+| Models | `~/.ollama/models` (shared with Ollama), or a folder you choose |
+
+Capy keeps its own opencode folders, so it never collides with an opencode you've
+installed yourself. **Open config folder** in Settings jumps straight there.
 
 ## Develop
 
 ```sh
-npm install      # also downloads the pinned Ollama + opencode binaries into resources/bin
-npm run dev
+npm install          # dependencies + pinned Ollama/opencode builds in resources/bin
+npm run dev          # run with hot reload
+npm run typecheck
+npm run dist         # signed + notarized arm64 DMG/zip in dist/
 ```
 
-Pinned runtime versions live in `package.json` → `"binaries"`. Bump them there (and the matching
-`@opencode-ai/sdk` / `opencode-darwin-arm64` versions), then run `npm run fetch-binaries`.
-
-## How it works
+Pinned runtime versions live in `package.json` → `"binaries"`; bump them together with
+`@opencode-ai/sdk` and `opencode-darwin-arm64`, then run `npm run fetch-binaries`.
+Release builds need a Developer ID certificate plus `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID`.
 
 ```
-Electron main
- ├─ OllamaRuntime   (src/main/ollama.ts)    ollama serve on a random localhost port, 32K context
- ├─ OpencodeRuntime (src/main/opencode.ts)  opencode serve on a random port, per-launch password,
- │                                          private data dir, provider → bundled Ollama
- └─ IPC             (src/main/index.ts)     sessions, prompts, abort, permission replies, event stream
-Renderer (React + Tailwind)
- └─ Setup (runtime status, model download) → Workspace (folder picker) → Chat (stream, tools, approvals)
+src/main/       Electron main: services (ollama.ts, opencode.ts), settings, extensions, IPC
+src/preload/    The window.api bridge
+src/renderer/   React UI: chat, sidebar, pickers, settings/
+src/shared/     Types shared by both sides
+assets/         README images and demo
 ```
 
-- Models are stored in `~/.ollama/models` by default, shared with any Ollama install the user already has.
-- opencode's data lives in `~/Library/Application Support/Capy/opencode`, isolated from a user's own opencode.
-- File edits, shell commands and web fetches require approval in the UI.
+---
 
-## Settings
-
-Sidebar → **Settings** surfaces everything opencode supports:
-
-| Tab | What it edits |
-|---|---|
-| Models & general | Install/import/delete/switch models, title/summary model (`small_model`), model folder, context + output limits |
-| Permissions | All opencode permission keys (ask/allow/deny) with per-pattern rules |
-| Rules | Global `AGENTS.md`, extra instruction files/URLs, Claude Code `CLAUDE.md` toggle |
-| Agents | Built-in + custom agents, default agent, disable built-ins, per-agent overrides (model, thinking, temperature, top_p, steps, prompt, permissions), subagent depth, `agents/*.md` editor |
-| Commands | All commands, `commands/*.md` editor (run in chat as `/name args`) |
-| Skills | Loaded skills by source, `skills/<name>/SKILL.md` editor, extra skill folders/URLs, Claude Code skills toggle |
-| MCP servers | Add/edit local or remote servers (env/headers, cwd, timeout, OAuth) with live status |
-| Plugins & hooks | `plugins/*.ts` editor (hook template) and npm plugins |
-| Tools | Enable/disable each tool, `tools/*.ts` custom tools editor |
-| Formatters & LSP | Turn formatters/language servers on (off by default in opencode), per-tool toggles, custom ones |
-| Advanced | Compaction, tool output limits, image limits, snapshots, shell, username, log level, watcher ignores, experimental flags, references, managed keys, the full JSON layer, and the final config |
-
-How it's stored:
-
-- `~/Library/Application Support/Capy/settings.json`: app settings plus `opencode`, a JSON layer deep-merged
-  over the config Capy generates. Every structured screen edits this one object.
-- `~/Library/Application Support/Capy/opencode/config/opencode/`: opencode's global config folder for Capy
-  (`AGENTS.md`, `agents/`, `commands/`, `skills/`, `plugins/`, `tools/`). Projects can add their own
-  `AGENTS.md` and `.opencode/` folders as usual.
-- Claude Code compatibility (`~/.claude/skills`, `CLAUDE.md`) is **off by default** so Capy only uses what's
-  configured in Capy and prompts stay small for local models.
-
-Thinking levels come from Ollama per model (`/api/show`), so only levels a model actually supports are offered.
-
-Saving restarts opencode (and Ollama when storage or context changes); switching the model or agent doesn't.
-The generated config always pins opencode to the bundled Ollama (`enabled_providers: ["ollama"]`).
-
-## Release
-
-```sh
-npm run dist     # signed + notarized arm64 DMG/zip in dist/
-```
-
-Needs a Developer ID certificate and `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` env vars.
+[opencode docs](https://opencode.ai/docs/) · [Ollama](https://ollama.com) ·
+[Architecture](#architecture) · [Settings](#settings)

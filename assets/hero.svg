@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1960 800" width="1960" height="800" role="img" aria-label="Capy: your favorite capybara, helping you out without ever leaving your machine">
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E8F4FD"/><stop offset="1" stop-color="#C9E4F7"/></linearGradient>
+  <marker id="ah" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="12" refY="9" orient="auto"><path d="M3 2 L13 9 L3 16" fill="none" stroke="#2B1B2E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect width="1960" height="800" rx="40" fill="url(#sky)"/>
+<!-- water -->
+<path d="M0 712 C 220 692, 420 732, 660 712 S 1100 692, 1340 712 S 1760 732, 1960 712 L 1960 760 Q 1960 800 1920 800 L 40 800 Q 0 800 0 760 Z" fill="#A9D4F0"/>
+<path d="M60 750 c40 -10 80 -10 120 0 M300 770 c40 -10 80 -10 120 0 M560 748 c40 -10 80 -10 120 0 M1050 760 c40 -10 80 -10 120 0 M1500 748 c40 -10 80 -10 120 0" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.8"/>
+<!-- capybara (same art as the app icon) -->
+<g transform="translate(70,90) scale(0.93)"><g transform="translate(-270,-230)"><g stroke="#2B1B2E" stroke-width="20" stroke-linejoin="round" stroke-linecap="round">
+    <!-- ears -->
+    <ellipse cx="455" cy="300" rx="52" ry="58" fill="#C98A55"/>
+    <ellipse cx="455" cy="308" rx="22" ry="28" fill="#8A5A3C" stroke="none"/>
+    <ellipse cx="690" cy="305" rx="56" ry="60" fill="#C98A55"/>
+    <ellipse cx="694" cy="314" rx="26" ry="30" fill="#8A5A3C" stroke="none"/>
+    <!-- head + body -->
+    <path fill="#C98A55" d="M 300 500
+      C 290 360, 410 280, 560 282
+      C 700 284, 790 360, 800 470
+      C 840 560, 850 690, 820 770
+      C 795 845, 720 870, 610 870
+      L 430 870
+      C 345 870, 300 830, 312 760
+      C 322 700, 352 665, 372 640
+      C 318 620, 296 565, 300 500 Z"/>
+    <!-- belly -->
+    <path fill="#DDA572" stroke="none" d="M 380 650 C 430 620, 560 640, 600 720 C 630 790, 600 850, 520 858 L 430 858 C 360 858, 326 820, 332 765 C 340 705, 360 670, 380 650 Z"/>
+    <!-- muzzle -->
+    <path fill="#8A5A3C" stroke="none" d="M 305 500 C 300 420, 360 385, 430 392 C 500 400, 528 460, 515 530 C 505 590, 450 620, 390 612 C 335 605, 308 560, 305 500 Z"/>
+    <!-- outline re-stroke over muzzle edge -->
+    <path fill="none" d="M 300 500 C 296 565, 318 620, 372 640"/>
+    <!-- nose -->
+    <path fill="#4A2C22" stroke="none" d="M 326 448 C 324 424, 420 418, 428 442 C 434 466, 400 492, 378 493 C 356 494, 328 472, 326 448 Z"/>
+    <ellipse cx="362" cy="440" rx="16" ry="7" fill="#7A4E3A" stroke="none" transform="rotate(-8 362 440)"/>
+    <!-- mouth -->
+    <path fill="none" stroke-width="11" d="M 378 494 L 378 524 M 350 534 C 364 548, 392 548, 406 534"/>
+    <!-- eye -->
+    <circle cx="590" cy="420" r="36" fill="#2B1B2E" stroke="none"/>
+    <circle cx="578" cy="406" r="12" fill="#fff" stroke="none"/>
+    <circle cx="602" cy="434" r="6" fill="#fff" stroke="none"/>
+    <!-- cheek -->
+    <ellipse cx="610" cy="505" rx="34" ry="20" fill="#F2A7A0" opacity="0.7" stroke="none"/>
+    <!-- head shine -->
+    <ellipse cx="560" cy="330" rx="38" ry="18" fill="#E8B88A" stroke="none" transform="rotate(-10 560 330)"/>
+    <!-- arm -->
+    <path fill="none" stroke-width="16" d="M 470 690 C 520 700, 560 690, 600 660"/>
+    <!-- hind leg -->
+    <path fill="none" stroke-width="16" d="M 650 860 C 640 790, 690 740, 760 735"/>
+    <!-- feet -->
+    <path fill="#8A5A3C" d="M 395 870 C 385 820, 415 790, 450 800 C 480 810, 490 850, 480 875 Z"/>
+    <path fill="#8A5A3C" d="M 520 875 C 512 830, 540 805, 572 812 C 600 820, 608 855, 600 878 Z"/>
+    <!-- water line -->
+  </g></g></g>
+<!-- headline -->
+<g font-family="ui-rounded, 'SF Pro Rounded', -apple-system, 'Segoe UI', sans-serif">
+  <text x="720" y="185" font-size="120" font-weight="800" fill="#2B1B2E">Capy</text>
+  <text x="720" y="268" font-size="44" font-weight="600" fill="#2B1B2E">Your favorite capybara, helping you out</text>
+  <text x="720" y="326" font-size="44" font-weight="600" fill="#2B1B2E">without ever leaving your machine.</text>
+  <text x="720" y="390" font-size="26" fill="#55606E">A desktop app for coding agents that run on local models, made for Apple Silicon Macs.</text>
+  <!-- Your Mac boundary -->
+  <rect x="690" y="440" width="1250" height="250" rx="30" fill="none" stroke="#5B8DB8" stroke-width="4" stroke-dasharray="14 12"/>
+  <rect x="712" y="425" width="350" height="34" rx="17" fill="#5B8DB8"/>
+  <text x="887" y="449" text-anchor="middle" font-size="20" font-weight="700" fill="#FFFFFF">YOUR MAC · NOTHING LEAVES</text>
+  <g transform="translate(720,470)">
+  <rect width="210" height="190" rx="22" fill="#FFFDF8" stroke="#2B1B2E" stroke-width="5"/>
+  <g transform="translate(105,72)" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M-34 -26 h68 a12 12 0 0 1 12 12 v30 a12 12 0 0 1 -12 12 h-38 l-18 14 v-14 h-12 a12 12 0 0 1 -12 -12 v-30 a12 12 0 0 1 12 -12z" fill="#CFE6F7"/><circle cx="-16" cy="1" r="3" fill="#2B1B2E"/><circle cx="0" cy="1" r="3" fill="#2B1B2E"/><circle cx="16" cy="1" r="3" fill="#2B1B2E"/></g>
+  <text x="105" y="145" text-anchor="middle" font-size="27" font-weight="700" fill="#2B1B2E">Ask</text>
+  <text x="105" y="173" text-anchor="middle" font-size="18" fill="#6B5A62">chat or /command</text>
+</g><g transform="translate(965,470)">
+  <rect width="210" height="190" rx="22" fill="#FFFDF8" stroke="#2B1B2E" stroke-width="5"/>
+  <g transform="translate(105,72)" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="-30" y="-30" width="60" height="60" rx="10" fill="#F2D3B0"/><rect x="-14" y="-14" width="28" height="28" rx="4"/><path d="M-30 -14 h-10 M-30 0 h-10 M-30 14 h-10 M30 -14 h10 M30 0 h10 M30 14 h10 M-14 -30 v-10 M0 -30 v-10 M14 -30 v-10 M-14 30 v10 M0 30 v10 M14 30 v10"/></g>
+  <text x="105" y="145" text-anchor="middle" font-size="27" font-weight="700" fill="#2B1B2E">Local model</text>
+  <text x="105" y="173" text-anchor="middle" font-size="18" fill="#6B5A62">Ollama + MLX</text>
+</g><g transform="translate(1210,470)">
+  <rect width="210" height="190" rx="22" fill="#FFFDF8" stroke="#2B1B2E" stroke-width="5"/>
+  <g transform="translate(105,72)" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8 -36 l-28 40 h22 l-8 32 l30 -44 h-22z" fill="#F5C66B"/></g>
+  <text x="105" y="145" text-anchor="middle" font-size="27" font-weight="700" fill="#2B1B2E">Agent</text>
+  <text x="105" y="173" text-anchor="middle" font-size="18" fill="#6B5A62">opencode tools</text>
+</g><g transform="translate(1455,470)">
+  <rect width="210" height="190" rx="22" fill="#FFFDF8" stroke="#2B1B2E" stroke-width="5"/>
+  <g transform="translate(105,72)" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M0 -38 l32 12 v22 c0 22 -14 36 -32 44 c-18 -8 -32 -22 -32 -44 v-22z" fill="#BFE3C6"/><path d="M-13 1 l9 9 l18 -19"/></g>
+  <text x="105" y="145" text-anchor="middle" font-size="27" font-weight="700" fill="#2B1B2E">You approve</text>
+  <text x="105" y="173" text-anchor="middle" font-size="18" fill="#6B5A62">edits &amp; commands</text>
+</g><g transform="translate(1700,470)">
+  <rect width="210" height="190" rx="22" fill="#FFFDF8" stroke="#2B1B2E" stroke-width="5"/>
+  <g transform="translate(105,72)" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M-26 -36 h34 l18 18 v54 h-52z" fill="#FFFFFF"/><path d="M8 -36 v18 h18"/><path d="M-15 -4 h22 M-15 10 h28"/><circle cx="22" cy="26" r="17" fill="#7BC58A"/><path d="M14 26 l6 6 l10 -11"/></g>
+  <text x="105" y="145" text-anchor="middle" font-size="27" font-weight="700" fill="#2B1B2E">Done</text>
+  <text x="105" y="173" text-anchor="middle" font-size="18" fill="#6B5A62">files on disk</text>
+</g>
+  <path d="M940 565 h17" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" marker-end="url(#ah)"/><path d="M1185 565 h17" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" marker-end="url(#ah)"/><path d="M1430 565 h17" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" marker-end="url(#ah)"/><path d="M1675 565 h17" stroke="#2B1B2E" stroke-width="5" stroke-linecap="round" marker-end="url(#ah)"/>
+</g>
+</svg>
