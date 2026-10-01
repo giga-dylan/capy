@@ -8,6 +8,7 @@
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
   <g clip-path="url(#tile)" stroke="#2B1B2E" stroke-width="20" stroke-linejoin="round" stroke-linecap="round">
+  <g transform="translate(512 512) scale(0.9) translate(-568 -560)">
     <!-- ears -->
     <ellipse cx="455" cy="300" rx="52" ry="58" fill="#C98A55"/>
     <ellipse cx="455" cy="308" rx="22" ry="28" fill="#8A5A3C" stroke="none"/>
@@ -50,5 +51,6 @@
     <path fill="#8A5A3C" d="M 395 870 C 385 820, 415 790, 450 800 C 480 810, 490 850, 480 875 Z"/>
     <path fill="#8A5A3C" d="M 520 875 C 512 830, 540 805, 572 812 C 600 820, 608 855, 600 878 Z"/>
     <!-- water line -->
+    </g>
   </g>
 </svg>
